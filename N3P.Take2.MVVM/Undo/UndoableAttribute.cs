@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Specialized;
 
 namespace N3P.MVVM.Undo
@@ -31,76 +30,17 @@ namespace N3P.MVVM.Undo
 
         private static object AfterGet(IServiceProvider serviceProvider, object model, string propertyName, object value)
         {
-            var valueProvider = value as IServiceProviderProvider;
-
-            if (valueProvider != null)
-            {
-                valueProvider.Parents.Add((IServiceProviderProvider) model);
-                return value;
-            }
-
-            var valueDict = value as IDictionary;
-
-            if (valueDict != null)
-            {
-                foreach (var val in valueDict)
-                {
-                    var key = ((dynamic) val).Key;
-                    var keyProvider = key as IServiceProviderProvider;
-
-                    if (keyProvider != null)
-                    {
-                        keyProvider.Parents.Add((IServiceProviderProvider) model);
-                    }
-
-                    var v = ((dynamic)val).Value;
-                    var vProvider = v as IServiceProviderProvider;
-                    
-                    if (vProvider != null)
-                    {
-                        vProvider.Parents.Add((IServiceProviderProvider) model);
-                    }
-                }
-
-                return value;
-            }
-
+            var handler = serviceProvider.GetService<UndoHandler>();
             var valInp = value as INotifyCollectionChanged;
 
             if (valInp != null)
             {
-                valInp.CollectionChanged += (sender, args) =>
+                NotifyCollectionChangedEventHandler capture;
+
+                if (!handler.CollectionChangeHandlers.TryGetValue(valInp, out capture))
                 {
-                    var handler = serviceProvider.GetService<UndoHandler>();
-                    handler.MakeVolatile();
-
-                    if (args.NewItems != null)
-                    {
-                        foreach (var val in args.NewItems)
-                        {
-                            var valProvider = val as IServiceProviderProvider;
-
-                            if (valProvider != null)
-                            {
-                                valProvider.Parents.Add((IServiceProviderProvider)model);
-                            }
-                        }
-                    }
-                };
-            }
-
-            var valueCollection = value as IEnumerable;
-
-            if (valueCollection != null)
-            {
-                foreach (var val in valueCollection)
-                {
-                    var valProvider = val as IServiceProviderProvider;
-
-                    if (valProvider != null)
-                    {
-                        valProvider.Parents.Add((IServiceProviderProvider) model);
-                    }
+                    capture = handler.CollectionChangeHandlers[valInp] = (sender, args) => handler.MakeVolatile();
+                    valInp.CollectionChanged += capture;
                 }
             }
 

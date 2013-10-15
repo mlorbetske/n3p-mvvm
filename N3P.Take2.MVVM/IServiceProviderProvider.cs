@@ -7,5 +7,7 @@ namespace N3P.MVVM
         TService GetService<TService>();
 
         HashSet<IServiceProviderProvider> Parents { get; }
+
+        HashSet<IServiceProviderProvider> Children { get; }
     }
 }

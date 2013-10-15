@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Linq;
 using System.Linq.Expressions;
+using N3P.MVVM.Dirty;
 using N3P.MVVM.Undo;
 
 namespace N3P.MVVM
@@ -11,6 +13,7 @@ namespace N3P.MVVM
         where TModel : BindableBase<TModel>
     {
         private readonly HashSet<IServiceProviderProvider> _parents = new HashSet<IServiceProviderProvider>();
+        private readonly HashSet<IServiceProviderProvider> _children = new HashSet<IServiceProviderProvider>();
         private readonly Dictionary<Type, Dictionary<string, object>> _serviceLookup = new Dictionary<Type, Dictionary<string, object>>();
         private readonly ServiceProviderImpl _serviceProvider;
         private readonly Dictionary<string, object> _values = new Dictionary<string, object>();
@@ -24,6 +27,8 @@ namespace N3P.MVVM
         }
 
         HashSet<IServiceProviderProvider> IServiceProviderProvider.Parents { get { return _parents; } }
+
+        HashSet<IServiceProviderProvider> IServiceProviderProvider.Children { get { return _children; } }
 
         public static IEnumerable<TDelegate> GetActions<TDelegate, T>(Expression<Func<TModel, T>> propertyAccessor)
         {
@@ -57,6 +62,8 @@ namespace N3P.MVVM
         public Action GetStateRestorer()
         {
             var actions = new List<Action<BindableBase<TModel>>> { m => m._values.Clear() };
+            var dirtyHandler = _serviceProvider == null ? null : GetService<DirtyableService>();
+            var wasDirty = dirtyHandler != null && dirtyHandler.IsDirty;
 
             foreach (var entry in _values)
             {
@@ -164,6 +171,20 @@ namespace N3P.MVVM
                 actions.Add(m => m._values[key] = value);
             }
 
+            actions.Add(m =>
+            {
+                dirtyHandler = GetService<DirtyableService>();
+
+                if (wasDirty)
+                {
+                    dirtyHandler.MarkDirty();
+                }
+                else
+                {
+                    dirtyHandler.Clean();
+                }
+            });
+
             return () =>
             {
                 foreach (var action in actions)
@@ -200,12 +221,115 @@ namespace N3P.MVVM
                 existing = behavior(specializedProvider, this, name, existing);
             }
 
+            WireUpParentChildRelationships(existing);
+
             if (!Equals(existing, current))
             {
                 _values[name] = existing;
             }
 
             return (T)existing;
+        }
+
+        private readonly Dictionary<INotifyCollectionChanged, NotifyCollectionChangedEventHandler> _notifyCollectionChangedEventHandlers = new Dictionary<INotifyCollectionChanged, NotifyCollectionChangedEventHandler>();
+
+        private void WireUpParentChildRelationships(object value)
+        {
+            var valueProvider = value as IServiceProviderProvider;
+            var modelProvider = (IServiceProviderProvider) this;
+
+            if (valueProvider != null)
+            {
+                valueProvider.Parents.Add(modelProvider);
+                modelProvider.Children.Add(valueProvider);
+                return;
+            }
+
+            var valueDict = value as IDictionary;
+
+            if (valueDict != null)
+            {
+                foreach (var val in valueDict)
+                {
+                    var key = ((dynamic)val).Key;
+                    var keyProvider = key as IServiceProviderProvider;
+
+                    if (keyProvider != null)
+                    {
+                        keyProvider.Parents.Add(modelProvider);
+                        modelProvider.Children.Add(keyProvider);
+                    }
+
+                    var v = ((dynamic)val).Value;
+                    var vProvider = v as IServiceProviderProvider;
+
+                    if (vProvider != null)
+                    {
+                        vProvider.Parents.Add(modelProvider);
+                        modelProvider.Children.Add(vProvider);
+                    }
+                }
+
+                return;
+            }
+
+            var valInp = value as INotifyCollectionChanged;
+
+            if (valInp != null)
+            {
+                NotifyCollectionChangedEventHandler handler;
+                if (!_notifyCollectionChangedEventHandlers.TryGetValue(valInp, out handler))
+                {
+                    handler = _notifyCollectionChangedEventHandlers[valInp] = (sender, args) =>
+                    {
+                        if (args.OldItems != null)
+                        {
+                            foreach (var val in args.OldItems)
+                            {
+                                var valProvider = val as IServiceProviderProvider;
+
+                                if (valProvider != null)
+                                {
+                                    valProvider.Parents.Remove(modelProvider);
+                                    modelProvider.Children.Remove(valProvider);
+                                }
+                            }
+                        }
+
+                        if (args.NewItems != null)
+                        {
+                            foreach (var val in args.NewItems)
+                            {
+                                var valProvider = val as IServiceProviderProvider;
+
+                                if (valProvider != null)
+                                {
+                                    valProvider.Parents.Add(modelProvider);
+                                    modelProvider.Children.Add(valProvider);
+                                }
+                            }
+                        }
+                    };
+
+                    valInp.CollectionChanged += handler;
+                }
+            }
+
+            var valueCollection = value as IEnumerable;
+
+            if (valueCollection != null)
+            {
+                foreach (var val in valueCollection)
+                {
+                    var valProvider = val as IServiceProviderProvider;
+
+                    if (valProvider != null)
+                    {
+                        valProvider.Parents.Add(modelProvider);
+                        modelProvider.Children.Add(valProvider);
+                    }
+                }
+            }
         }
 
         protected void Set<T>(Expression<Func<TModel, T>> propertyAccessor, T value)

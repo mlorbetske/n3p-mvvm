@@ -47,6 +47,9 @@
     <Compile Include="ChangeTracking\INotifyPropertyChangedBindingBehavior.cs" />
     <Compile Include="ChangeTracking\NotifyOnChangeAttribute.cs" />
     <Compile Include="DelegateEqualityComparer.cs" />
+    <Compile Include="Dirty\DirtyableAttribute.cs" />
+    <Compile Include="Dirty\DirtyableExtensions.cs" />
+    <Compile Include="Dirty\DirtyableService.cs" />
     <Compile Include="Initialize\InitializeAttribute.cs" />
     <Compile Include="IServiceProviderProvider.cs" />
     <Compile Include="Logging\LogAttribute.cs" />
