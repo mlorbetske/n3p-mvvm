@@ -1,4 +1,4 @@
-﻿namespace N3P.Take2.MVVM
+﻿namespace N3P.MVVM
 {
     public enum BeforeSetAction
     {

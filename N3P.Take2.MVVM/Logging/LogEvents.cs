@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace N3P.Take2.MVVM.Logging
+namespace N3P.MVVM.Logging
 {
     [Flags]
     public enum LogEvents

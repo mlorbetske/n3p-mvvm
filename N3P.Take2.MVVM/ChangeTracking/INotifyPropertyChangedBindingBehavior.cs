@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel;
 
-namespace N3P.Take2.MVVM.ChangeTracking
+namespace N3P.MVVM.ChangeTracking
 {
     public interface INotifyPropertyChangedBindingBehavior : INotifyPropertyChanged
     {

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace N3P.Take2.MVVM
+namespace N3P.MVVM
 {
     public class DelegateEqualityComparer<TDelegate> : IEqualityComparer<TDelegate>
     {

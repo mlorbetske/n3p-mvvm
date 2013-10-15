@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 
-namespace N3P.Take2.MVVM.Logging
+namespace N3P.MVVM.Logging
 {
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
     public sealed class LogAttribute : BindingBehaviorAttributeBase
@@ -20,9 +20,9 @@ namespace N3P.Take2.MVVM.Logging
             get { return typeof(LoggingService); }
         }
 
-        public override object Service
+        public override object GetService(object model)
         {
-            get { return _service; }
+            return _service;
         }
 
         public LogAttribute(LogEvents events = LogEvents.BeforeGet | LogEvents.AfterGet | LogEvents.BeforeSet | LogEvents.AfterSet)

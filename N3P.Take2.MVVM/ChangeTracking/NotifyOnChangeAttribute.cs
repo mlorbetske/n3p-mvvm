@@ -1,7 +1,7 @@
 ﻿using System;
 using System.ComponentModel;
 
-namespace N3P.Take2.MVVM.ChangeTracking
+namespace N3P.MVVM.ChangeTracking
 {
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
     public sealed class NotifyOnChangeAttribute : BindingBehaviorAttributeBase
@@ -34,9 +34,9 @@ namespace N3P.Take2.MVVM.ChangeTracking
             get { return true; }
         }
 
-        public override object Service
+        public override object GetService(object model)
         {
-            get { return new NotifyPropertyChanged(); }
+            return new NotifyPropertyChanged();
         }
 
         private class NotifyPropertyChanged : INotifyPropertyChanged
