@@ -363,6 +363,7 @@ namespace N3P.MVVM
                 behavior(specializedProvider, this, name, value, ref current, changed);
             }
 
+            WireUpParentChildRelationships(current);
             _values[name] = current;
         }
 

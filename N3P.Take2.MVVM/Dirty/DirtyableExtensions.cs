@@ -1,4 +1,6 @@
-﻿namespace N3P.MVVM.Dirty
+﻿using System;
+
+namespace N3P.MVVM.Dirty
 {
     public static class DirtyableExtensions
     {
@@ -35,6 +37,28 @@
             if (svc != null)
             {
                 svc.MarkDirty();
+            }
+        }
+
+        public static void AddDirtyStateChangedHandler<TModel>(this TModel model, EventHandler handler)
+            where TModel : BindableBase<TModel>
+        {
+            var svc = model.GetService<DirtyableService>();
+
+            if (svc != null)
+            {
+                svc.DirtyStateChanged += handler;
+            }
+        }
+
+        public static void RemoveDirtyStateChangedHandler<TModel>(this TModel model, EventHandler handler)
+            where TModel : BindableBase<TModel>
+        {
+            var svc = model.GetService<DirtyableService>();
+
+            if (svc != null)
+            {
+                svc.DirtyStateChanged -= handler;
             }
         }
     }

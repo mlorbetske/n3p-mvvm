@@ -58,6 +58,7 @@
     <Compile Include="ServiceLookupResult.cs" />
     <Compile Include="ServiceProviderExtensions.cs" />
     <Compile Include="Undo\IExportStateRestorer.cs" />
+    <Compile Include="Undo\UndoableExtensions.cs" />
     <Compile Include="Undo\UndoHandler.cs" />
     <Compile Include="Undo\UndoableAttribute.cs" />
   </ItemGroup>

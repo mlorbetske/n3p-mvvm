@@ -37,7 +37,23 @@ namespace N3P.MVVM.Dirty
 
                 if (!svc.CollectionChangeHandlers.TryGetValue(valInp, out capture))
                 {
-                    capture = svc.CollectionChangeHandlers[valInp] = (sender, args) => svc.MarkDirty();
+                    capture = svc.CollectionChangeHandlers[valInp] = (sender, args) =>
+                    {
+                        if (args.NewItems != null)
+                        {
+                            foreach (var item in args.NewItems)
+                            {
+                                var spp = item as IServiceProviderProvider;
+
+                                if (spp != null)
+                                {
+                                    spp.Parents.Add((IServiceProviderProvider) model);
+                                }
+                            }
+                        }
+
+                        svc.MarkDirty();
+                    };
                     valInp.CollectionChanged += capture;
                 }
             }

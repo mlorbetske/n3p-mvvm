@@ -11,10 +11,21 @@ namespace N3P.MVVM.Undo
         private readonly Stack<Action> _redoStack = new Stack<Action>();
         private readonly IExportStateRestorer _target;
         private bool _operationInProgress;
+        private readonly object _sync = new object();
 
         public UndoHandler(IExportStateRestorer target)
         {
             _target = target;
+        }
+
+        public bool CanUndo
+        {
+            get { return _undoStack.Count > 0; }
+        }
+
+        public bool CanRedo
+        {
+            get { return _redoStack.Count > 0; }
         }
 
         public Func<Action> CurrentStateRestorer { get; private set; }
@@ -40,6 +51,8 @@ namespace N3P.MVVM.Undo
             }
         }
 
+        public bool SuspendAutoStateCapture { get; set; }
+
         private void MakeAllParentsVolatile()
         {
             var provider = _target as IServiceProviderProvider;
@@ -62,45 +75,54 @@ namespace N3P.MVVM.Undo
 
         public void MakeVolatile()
         {
-            if (_operationInProgress)
+            lock (_sync)
             {
-                return;
-            }
+                if (_operationInProgress || !_operationInProgress && SuspendAutoStateCapture)
+                {
+                    return;
+                }
 
-            MakeVolatileInternal();
-            MakeAllParentsVolatile();
+                MakeVolatileInternal();
+                MakeAllParentsVolatile();
+            }
         }
 
         public void Undo()
         {
-            if (_undoStack.Count == 0)
+            lock (_sync)
             {
-                return;
-            }
+                if (_undoStack.Count == 0)
+                {
+                    return;
+                }
 
-            _operationInProgress = true;
-            _redoStack.Push(CurrentStateRestorer());
-            var frame = _undoStack.Pop();
-            frame();
-            CurrentStateRestorer = () => frame;
-            MakeAllParentsVolatile();
-            _operationInProgress = false;
+                _operationInProgress = true;
+                _redoStack.Push(CurrentStateRestorer());
+                var frame = _undoStack.Pop();
+                frame();
+                CurrentStateRestorer = () => frame;
+                MakeAllParentsVolatile();
+                _operationInProgress = false;
+            }
         }
 
         public void Redo()
         {
-            if (_redoStack.Count == 0)
+            lock (_sync)
             {
-                return;
-            }
+                if (_redoStack.Count == 0)
+                {
+                    return;
+                }
 
-            _operationInProgress = true;
-            _undoStack.Push(CurrentStateRestorer());
-            var frame = _redoStack.Pop();
-            frame();
-            CurrentStateRestorer = () => frame;
-            MakeAllParentsVolatile();
-            _operationInProgress = false;
+                _operationInProgress = true;
+                _undoStack.Push(CurrentStateRestorer());
+                var frame = _redoStack.Pop();
+                frame();
+                CurrentStateRestorer = () => frame;
+                MakeAllParentsVolatile();
+                _operationInProgress = false;
+            }
         }
 
         public Action GetStateRestorer()

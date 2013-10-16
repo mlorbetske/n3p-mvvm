@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Collections.Specialized;
 
 namespace N3P.MVVM.Dirty
@@ -16,20 +17,37 @@ namespace N3P.MVVM.Dirty
 
         public void MarkDirty()
         {
+            if (IsDirty)
+            {
+                return;
+            }
+
+            MarkDirtyInternal();
+        }
+
+        private void MarkDirtyInternal()
+        {
             foreach (var parent in _model.Parents)
             {
                 var svc = parent.GetService<DirtyableService>();
 
                 if (svc != null)
                 {
-                    svc.MarkDirty();
+                    svc.MarkDirtyInternal();
                 }
             }
 
-            IsDirty = true;
+            var s = _model.GetService<DirtyableService>();
+            var oldDirty = s.IsDirty;
+            s.IsDirty = true;
+
+            if (oldDirty ^ s.IsDirty)
+            {
+                s.OnDirtyStateChanged();
+            }
         }
 
-        public void Clean()
+        private void CleanInternal()
         {
             foreach (var child in _model.Children)
             {
@@ -37,12 +55,41 @@ namespace N3P.MVVM.Dirty
 
                 if (svc != null)
                 {
-                    svc.Clean();
+                    svc.CleanInternal();
                 }
             }
 
-            IsDirty = false;
+            var s = _model.GetService<DirtyableService>();
+            var oldDirty = s.IsDirty;
+            s.IsDirty = false;
+
+            if (oldDirty ^ s.IsDirty)
+            {
+                s.OnDirtyStateChanged();
+            }
         }
+
+        public void Clean()
+        {
+            if (!IsDirty)
+            {
+                return;
+            }
+
+            CleanInternal();
+        }
+
+        private void OnDirtyStateChanged()
+        {
+            var handler = DirtyStateChanged;
+
+            if (handler != null)
+            {
+                handler(this, new EventArgs());
+            }
+        }
+
+        public event EventHandler DirtyStateChanged;
 
         internal readonly Dictionary<INotifyCollectionChanged, NotifyCollectionChangedEventHandler> CollectionChangeHandlers = new Dictionary<INotifyCollectionChanged, NotifyCollectionChangedEventHandler>();
     }
