@@ -61,6 +61,12 @@ namespace N3P.MVVM.Initialize
                     
                     initProp = initProp ?? model.GetType().GetProperty(cfg.InitializationParametersStaticPropertyName, BindingFlags.Public | BindingFlags.Static);
 
+                    if (initProp == null)
+                    {
+                        var val = cfg.InitializationParametersStaticPropertyName;
+                        return (cfg.DefaultValue = () => val)();
+                    }
+
                     if (initProp.PropertyType != typeof (object[]))
                     {
                         return (cfg.DefaultValue = () => initProp.GetValue(null, null))();

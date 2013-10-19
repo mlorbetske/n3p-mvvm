@@ -2,14 +2,16 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Linq;
 using System.Linq.Expressions;
+using N3P.MVVM.ChangeTracking;
 using N3P.MVVM.Dirty;
 using N3P.MVVM.Undo;
 
 namespace N3P.MVVM
 {
-    public class BindableBase<TModel> : IExportStateRestorer, IServiceProviderProvider
+    public class BindableBase<TModel> : IExportStateRestorer, IServiceProviderProvider, INotifyPropertyChanged
         where TModel : BindableBase<TModel>
     {
         private readonly HashSet<IServiceProviderProvider> _parents = new HashSet<IServiceProviderProvider>();
@@ -59,6 +61,109 @@ namespace N3P.MVVM
             return _serviceProvider.Specialized(propertyAccessor);
         }
 
+        private void GetDictionaryStateRestorer(IDictionary bindableDictionary, string key, List<Action<BindableBase<TModel>>> actions)
+        {
+            actions.Add(m => ((IDictionary)(m._values[key] = bindableDictionary)).Clear());
+
+            foreach (var child in bindableDictionary)
+            {
+                var childKey = ((dynamic)child).Key;
+                var childValue = ((dynamic)child).Value;
+
+                if (childKey is IExportStateRestorer)
+                {
+                    var childKeyAct = ((IExportStateRestorer)childKey).GetStateRestorer();
+
+                    if (childValue is IExportStateRestorer)
+                    {
+                        var childValueAct = ((IExportStateRestorer)childValue).GetStateRestorer();
+                        actions.Add(m =>
+                        {
+                            childKeyAct();
+                            childValueAct();
+                            m._values[childKey] = childValue;
+                        });
+                    }
+                    else
+                    {
+                        actions.Add(m =>
+                        {
+                            childKeyAct();
+                            ((IDictionary)m._values)[childKey] = childValue;
+                        });
+                    }
+                }
+                else if (childValue is IExportStateRestorer)
+                {
+                    var childValueAct = ((IExportStateRestorer)childValue).GetStateRestorer();
+                    actions.Add(m =>
+                    {
+                        childValueAct();
+                        ((IDictionary)m._values[key])[childKey] = childValue;
+                    });
+                }
+                else
+                {
+                    actions.Add(m => m._values[childKey] = childValue);
+                }
+            }
+        }
+
+        public void GetListStateRestorer(IList bindableList, string key, List<Action<BindableBase<TModel>>> actions)
+        {
+            actions.Add(m => ((IList)(m._values[key] = bindableList)).Clear());
+
+            foreach (var child in bindableList)
+            {
+                var childVal = child;
+                if (child is IExportStateRestorer)
+                {
+                    var childAct = ((IExportStateRestorer)child).GetStateRestorer();
+                    actions.Add(m =>
+                    {
+                        childAct();
+                        ((IList)m._values[key]).Add(childVal);
+                    });
+                }
+                else
+                {
+                    actions.Add(m => ((IList)m._values[key]).Add(childVal));
+                }
+            }
+        }
+
+        private void GetDirtyStateRestorer(bool wasDirty, List<Action<BindableBase<TModel>>> actions)
+        {
+            actions.Add(m =>
+            {
+                var dirtyHandler = GetService<DirtyableService>();
+
+                if (dirtyHandler == null)
+                {
+                    return;
+                }
+
+                if (wasDirty)
+                {
+                    dirtyHandler.MarkDirty();
+                }
+                else
+                {
+                    dirtyHandler.Clean();
+                }
+            });
+        }
+
+        private void GetNestedStateRestorer(IExportStateRestorer bindable, string key, List<Action<BindableBase<TModel>>> actions)
+        {
+            var act = bindable.GetStateRestorer();
+            actions.Add(m =>
+            {
+                m._values[key] = bindable;
+                act();
+            });
+        }
+
         public Action GetStateRestorer()
         {
             var actions = new List<Action<BindableBase<TModel>>> { m => m._values.Clear() };
@@ -72,20 +177,17 @@ namespace N3P.MVVM
                 if (entry.Value == null)
                 {
                     actions.Add(m => m._values[key] = null);
+                    actions.Add(m => ((TModel)m).OnPropertyChanged(key));
                     continue;
                 }
 
-                var bindable = entry.Value as IExportStateRestorer;
                 var value = entry.Value;
+                var bindable = value as IExportStateRestorer;
 
                 if (bindable != null)
                 {
-                    var act = bindable.GetStateRestorer();
-                    actions.Add(m =>
-                    {
-                        m._values[key] = value;
-                        act();
-                    });
+                    GetNestedStateRestorer(bindable, key, actions);
+                    actions.Add(m => ((TModel)m).OnPropertyChanged(key));
                     continue;
                 }
 
@@ -93,51 +195,8 @@ namespace N3P.MVVM
 
                 if (bindableDictionary != null)
                 {
-                    actions.Add(m => ((IDictionary)(m._values[key] = value)).Clear());
-
-                    foreach (var child in bindableDictionary)
-                    {
-                        var childKey = ((dynamic)child).Key;
-                        var childValue = ((dynamic)child).Value;
-
-                        if (childKey is IExportStateRestorer)
-                        {
-                            var childKeyAct = ((IExportStateRestorer)childKey).GetStateRestorer();
-
-                            if (childValue is IExportStateRestorer)
-                            {
-                                var childValueAct = ((IExportStateRestorer)childValue).GetStateRestorer();
-                                actions.Add(m =>
-                                {
-                                    childKeyAct();
-                                    childValueAct();
-                                    m._values[childKey] = childValue;
-                                });
-                            }
-                            else
-                            {
-                                actions.Add(m =>
-                                {
-                                    childKeyAct();
-                                    ((IDictionary)m._values)[childKey] = childValue;
-                                });
-                            }
-                        }
-                        else if (childValue is IExportStateRestorer)
-                        {
-                            var childValueAct = ((IExportStateRestorer)childValue).GetStateRestorer();
-                            actions.Add(m =>
-                            {
-                                childValueAct();
-                                ((IDictionary)m._values[key])[childKey] = childValue;
-                            });
-                        }
-                        else
-                        {
-                            actions.Add(m => m._values[childKey] = childValue);
-                        }
-                    }
-
+                    GetDictionaryStateRestorer(bindableDictionary, key, actions);
+                    actions.Add(m => ((TModel)m).OnPropertyChanged(key));
                     continue;
                 }
 
@@ -145,45 +204,16 @@ namespace N3P.MVVM
 
                 if (bindableList != null)
                 {
-                    actions.Add(m => ((IList)(m._values[key] = value)).Clear());
-
-                    foreach (var child in bindableList)
-                    {
-                        var childVal = child;
-                        if (child is IExportStateRestorer)
-                        {
-                            var childAct = ((IExportStateRestorer)child).GetStateRestorer();
-                            actions.Add(m =>
-                            {
-                                childAct();
-                                ((IList)m._values[key]).Add(childVal);
-                            });
-                        }
-                        else
-                        {
-                            actions.Add(m => ((IList)m._values[key]).Add(childVal));
-                        }
-                    }
-
+                    GetListStateRestorer(bindableList, key, actions);
+                    actions.Add(m => ((TModel)m).OnPropertyChanged(key));
                     continue;
                 }
 
                 actions.Add(m => m._values[key] = value);
+                actions.Add(m => ((TModel) m).OnPropertyChanged(key));
             }
 
-            actions.Add(m =>
-            {
-                dirtyHandler = GetService<DirtyableService>();
-
-                if (wasDirty)
-                {
-                    dirtyHandler.MarkDirty();
-                }
-                else
-                {
-                    dirtyHandler.Clean();
-                }
-            });
+            GetDirtyStateRestorer(wasDirty, actions);
 
             return () =>
             {
@@ -464,6 +494,28 @@ namespace N3P.MVVM
             public IServiceProvider Specialized<T>(Expression<Func<TModel, T>> property)
             {
                 return new ServiceProviderImpl(_owner, property, this);
+            }
+        }
+
+        event PropertyChangedEventHandler INotifyPropertyChanged.PropertyChanged
+        {
+            add
+            {
+                var inp = GetService<INotifyPropertyChanged>();
+
+                if (inp != null)
+                {
+                    inp.PropertyChanged += value;
+                }
+            }
+            remove
+            {
+                var inp = GetService<INotifyPropertyChanged>();
+
+                if (inp != null)
+                {
+                    inp.PropertyChanged -= value;
+                }
             }
         }
     }

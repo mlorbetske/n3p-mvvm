@@ -46,6 +46,7 @@
     <Compile Include="BindingActionExtensions.cs" />
     <Compile Include="ChangeTracking\INotifyPropertyChangedBindingBehavior.cs" />
     <Compile Include="ChangeTracking\NotifyOnChangeAttribute.cs" />
+    <Compile Include="Command.cs" />
     <Compile Include="DelegateEqualityComparer.cs" />
     <Compile Include="Dirty\DirtyableAttribute.cs" />
     <Compile Include="Dirty\DirtyableExtensions.cs" />

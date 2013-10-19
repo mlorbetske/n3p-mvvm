@@ -7,7 +7,7 @@ namespace N3P.MVVM.Undo
     public sealed class UndoableAttribute : BindingBehaviorAttributeBase
     {
         public UndoableAttribute()
-            : base(afterGet: AfterGet, beforeSet: AfterSet, afterGetPriority: int.MaxValue, afterSetPriority: int.MaxValue)
+            : base(afterGet: AfterGet, beforeSet: BeforeSet, afterGetPriority: int.MaxValue, afterSetPriority: int.MaxValue)
         {
         }
 
@@ -47,7 +47,7 @@ namespace N3P.MVVM.Undo
             return value;
         }
 
-        private static BeforeSetAction AfterSet(IServiceProvider serviceprovider, object model, string propertyname, ref object proposedValue, ref object currentvalue)
+        private static BeforeSetAction BeforeSet(IServiceProvider serviceprovider, object model, string propertyname, ref object proposedValue, ref object currentvalue)
         {
             var handler = serviceprovider.GetService<UndoHandler>();
             handler.MakeVolatile();

@@ -19,7 +19,7 @@ namespace N3P.MVVM.ChangeTracking
 
                 if (inp != null)
                 {
-                    inp.OnPropertyChanged(propertyName);
+                    inp.OnPropertyChanged(model, propertyName);
                 }
             }
         }
@@ -39,18 +39,32 @@ namespace N3P.MVVM.ChangeTracking
             return new NotifyPropertyChanged();
         }
 
-        private class NotifyPropertyChanged : INotifyPropertyChanged
+        internal class NotifyPropertyChanged : INotifyPropertyChanged
         {
             public event PropertyChangedEventHandler PropertyChanged;
 
-            public void OnPropertyChanged(string propertyName)
+            public void OnPropertyChanged(object model, string propertyName)
             {
                 var handler = PropertyChanged;
                 
                 if (handler != null)
                 {
-                    handler(this, new PropertyChangedEventArgs(propertyName));
+                    handler(model, new PropertyChangedEventArgs(propertyName));
                 }
+            }
+        }
+    }
+
+    public static class NotifyOnChangeExtensions
+    {
+        public static void OnPropertyChanged<T>(this T sender, string propertyName)
+            where T : BindableBase<T>
+        {
+            var svc =  sender.GetService<INotifyPropertyChanged>() as NotifyOnChangeAttribute.NotifyPropertyChanged;
+
+            if (svc != null)
+            {
+                svc.OnPropertyChanged(sender, propertyName);
             }
         }
     }

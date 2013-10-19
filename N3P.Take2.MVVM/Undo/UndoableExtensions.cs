@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
-namespace N3P.MVVM.Undo
+﻿namespace N3P.MVVM.Undo
 {
     public static class UndoableExtensions
     {
