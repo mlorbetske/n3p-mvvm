@@ -4,7 +4,7 @@ using System.Collections.Specialized;
 
 namespace N3P.MVVM.Dirty
 {
-    public class DirtyableService
+    public class DirtyableService: IInitializationCompleteCallback
     {
         private readonly IServiceProviderProvider _model;
 
@@ -17,11 +17,6 @@ namespace N3P.MVVM.Dirty
 
         public void MarkDirty()
         {
-            if (IsDirty)
-            {
-                return;
-            }
-
             MarkDirtyInternal();
         }
 
@@ -71,11 +66,6 @@ namespace N3P.MVVM.Dirty
 
         public void Clean()
         {
-            if (!IsDirty)
-            {
-                return;
-            }
-
             CleanInternal();
         }
 
@@ -92,5 +82,10 @@ namespace N3P.MVVM.Dirty
         public event EventHandler DirtyStateChanged;
 
         internal readonly Dictionary<INotifyCollectionChanged, NotifyCollectionChangedEventHandler> CollectionChangeHandlers = new Dictionary<INotifyCollectionChanged, NotifyCollectionChangedEventHandler>();
+        
+        public void OnInitializationComplete()
+        {
+            Clean();
+        }
     }
 }

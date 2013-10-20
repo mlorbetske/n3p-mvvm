@@ -6,13 +6,15 @@
         <Grid.RowDefinitions>
             <RowDefinition />
             <RowDefinition />
+            <RowDefinition />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition />
             <ColumnDefinition />
         </Grid.ColumnDefinitions>
-        <TextBlock Text="{Binding Value, Mode=TwoWay}" />
-        <Button Grid.Row="1" Command="{Binding ChangeValueCommand}">Change Value</Button>
+        <TextBlock Text="{Binding SubModel.Value, Mode=TwoWay}" />
+        <Button Grid.Row="1" Grid.RowSpan="2"  Command="{Binding ChangeValueCommand}">Change Value</Button>
         <Button Grid.Row="1" Grid.Column="1" Command="{Binding UndoCommand}">Undo</Button>
+        <Button Grid.Row="2" Grid.Column="1" Command="{Binding RedoCommand}">Redo</Button>
     </Grid>
 </Window>

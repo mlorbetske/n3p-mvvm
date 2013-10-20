@@ -5,10 +5,10 @@ using System.Linq;
 
 namespace N3P.MVVM.Undo
 {
-    public class UndoHandler : IExportStateRestorer
+    public class UndoHandler : IExportStateRestorer, IInitializationCompleteCallback
     {
-        private readonly Stack<Action> _undoStack = new Stack<Action>();
-        private readonly Stack<Action> _redoStack = new Stack<Action>();
+        private readonly Stack<IExportedState> _undoStack = new Stack<IExportedState>();
+        private readonly Stack<IExportedState> _redoStack = new Stack<IExportedState>();
         private readonly IExportStateRestorer _target;
         private bool _operationInProgress;
         private readonly object _sync = new object();
@@ -28,7 +28,7 @@ namespace N3P.MVVM.Undo
             get { return _redoStack.Count > 0; }
         }
 
-        public Func<Action> CurrentStateRestorer { get; private set; }
+        public Func<IExportedState> CurrentStateRestorer { get; private set; }
 
         public void Reset()
         {
@@ -68,8 +68,15 @@ namespace N3P.MVVM.Undo
 
         private void MakeVolatileInternal()
         {
-            CurrentStateRestorer = _target.GetStateRestorer;
-            _undoStack.Push(CurrentStateRestorer());
+            var newState = _target.ExportState();
+
+            if (_undoStack.Count > 0 && newState.Equals(_undoStack.Peek()))
+            {
+                return;
+            }
+
+            CurrentStateRestorer = _target.ExportState;
+            _undoStack.Push(newState);
             _redoStack.Clear();
         }
 
@@ -99,7 +106,7 @@ namespace N3P.MVVM.Undo
                 _operationInProgress = true;
                 _redoStack.Push(CurrentStateRestorer());
                 var frame = _undoStack.Pop();
-                frame();
+                frame.Apply(_target);
                 CurrentStateRestorer = () => frame;
                 MakeAllParentsVolatile();
                 _operationInProgress = false;
@@ -118,7 +125,7 @@ namespace N3P.MVVM.Undo
                 _operationInProgress = true;
                 _undoStack.Push(CurrentStateRestorer());
                 var frame = _redoStack.Pop();
-                frame();
+                frame.Apply(_target);
                 CurrentStateRestorer = () => frame;
                 MakeAllParentsVolatile();
                 _operationInProgress = false;
@@ -148,6 +155,16 @@ namespace N3P.MVVM.Undo
             };
         }
 
+        public IExportedState ExportState()
+        {
+            return null;
+        }
+
         internal readonly Dictionary<INotifyCollectionChanged, NotifyCollectionChangedEventHandler> CollectionChangeHandlers = new Dictionary<INotifyCollectionChanged, NotifyCollectionChangedEventHandler>();
+        
+        public void OnInitializationComplete()
+        {
+            Reset();
+        }
     }
 }

@@ -18,8 +18,7 @@ namespace N3P.MVVM.WPFTest
             InitializeComponent();
             _origTitle = Title;
             ViewModel = new MainWindowViewModel();
-            ViewModel.ResetUndoState();
-            ViewModel.Clean();
+            ViewModel.FinializeInitialization();
             ViewModel.GetService<DirtyableService>().DirtyStateChanged += OnDirtyStateChanged;
         }
 

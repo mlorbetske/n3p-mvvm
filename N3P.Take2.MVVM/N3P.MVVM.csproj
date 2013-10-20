@@ -46,11 +46,15 @@
     <Compile Include="BindingActionExtensions.cs" />
     <Compile Include="ChangeTracking\INotifyPropertyChangedBindingBehavior.cs" />
     <Compile Include="ChangeTracking\NotifyOnChangeAttribute.cs" />
+    <Compile Include="ChangeTracking\NotifyOnChangeExtensions.cs" />
     <Compile Include="Command.cs" />
     <Compile Include="DelegateEqualityComparer.cs" />
     <Compile Include="Dirty\DirtyableAttribute.cs" />
     <Compile Include="Dirty\DirtyableExtensions.cs" />
     <Compile Include="Dirty\DirtyableService.cs" />
+    <Compile Include="IBindable.cs" />
+    <Compile Include="IExportedState.cs" />
+    <Compile Include="IInitializationCompleteCallback.cs" />
     <Compile Include="Initialize\InitializeAttribute.cs" />
     <Compile Include="IServiceProviderProvider.cs" />
     <Compile Include="Logging\LogAttribute.cs" />
@@ -62,6 +66,9 @@
     <Compile Include="Undo\UndoableExtensions.cs" />
     <Compile Include="Undo\UndoHandler.cs" />
     <Compile Include="Undo\UndoableAttribute.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Snippets\Snippets.snippet" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

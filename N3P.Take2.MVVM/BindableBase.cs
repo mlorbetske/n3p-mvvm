@@ -11,7 +11,7 @@ using N3P.MVVM.Undo;
 
 namespace N3P.MVVM
 {
-    public class BindableBase<TModel> : IExportStateRestorer, IServiceProviderProvider, INotifyPropertyChanged
+    public class BindableBase<TModel> : IServiceProviderProvider, IBindable<TModel>
         where TModel : BindableBase<TModel>
     {
         private readonly HashSet<IServiceProviderProvider> _parents = new HashSet<IServiceProviderProvider>();
@@ -26,6 +26,11 @@ namespace N3P.MVVM
             InstallPropertyServices();
 
             _serviceProvider = new ServiceProviderImpl(this, null, null);
+        }
+
+        public IEnumerable<TService> GetServices<TService>()
+        {
+            return _serviceProvider.GetServices<TService>();
         }
 
         HashSet<IServiceProviderProvider> IServiceProviderProvider.Parents { get { return _parents; } }
@@ -61,167 +66,241 @@ namespace N3P.MVVM
             return _serviceProvider.Specialized(propertyAccessor);
         }
 
-        private void GetDictionaryStateRestorer(IDictionary bindableDictionary, string key, List<Action<BindableBase<TModel>>> actions)
+        private class ListState : IExportedState
         {
-            actions.Add(m => ((IDictionary)(m._values[key] = bindableDictionary)).Clear());
+            private readonly IList _target;
+            private readonly List<KeyValuePair<object, object>> _values = new List<KeyValuePair<object, object>>();
 
-            foreach (var child in bindableDictionary)
+            public ListState(IList list)
             {
-                var childKey = ((dynamic)child).Key;
-                var childValue = ((dynamic)child).Value;
+                _target = list;
 
-                if (childKey is IExportStateRestorer)
+                foreach (var value in list)
                 {
-                    var childKeyAct = ((IExportStateRestorer)childKey).GetStateRestorer();
+                    var exportable = value as IExportStateRestorer;
 
-                    if (childValue is IExportStateRestorer)
+                    if (exportable != null)
                     {
-                        var childValueAct = ((IExportStateRestorer)childValue).GetStateRestorer();
-                        actions.Add(m =>
-                        {
-                            childKeyAct();
-                            childValueAct();
-                            m._values[childKey] = childValue;
-                        });
+                        _values.Add(new KeyValuePair<object, object>(value, exportable.ExportState()));
+                        continue;
+                    }
+
+                    var nestedList = value as IList;
+
+                    if (nestedList != null)
+                    {
+                        _values.Add(new KeyValuePair<object, object>(value, new ListState(nestedList)));
+                        continue;
+                    }
+
+                    _values.Add(new KeyValuePair<object, object>(value, value));
+                }
+            }
+
+            public IEnumerable<string> Keys { get {return new string[0];} }
+
+            public object this[string key]
+            {
+                get { throw new KeyNotFoundException(); }
+            }
+
+            public int Count { get { return 0; } }
+
+            public object Apply(object item)
+            {
+                _target.Clear();
+
+                foreach (var listItem in _values)
+                {
+                    var state = listItem.Value as IExportedState;
+
+                    if (state != null)
+                    {
+                        _target.Add(state.Apply(listItem.Key));
+                        continue;
+                    }
+
+                    _target.Add(listItem.Value);
+                }
+
+                return _target;
+            }
+
+            public bool WasDirty { get { return false; } }
+        }
+
+        private class BindableBaseState : IExportedState<TModel>
+        {
+            private readonly IDictionary<string, object> _stateStore = new Dictionary<string, object>();
+
+            private static object GetValueState(object value)
+            {
+                var exportable = value as IExportStateRestorer;
+
+                if (exportable != null)
+                {
+                    return exportable.ExportState();
+                }
+
+                var dict = value as IDictionary;
+
+                var list = value as IList;
+
+                if (list != null)
+                {
+                    return new ListState(list);
+                }
+
+                return value;
+            }
+
+            public BindableBaseState(IBindable<TModel> bindableBase)
+            {
+                WasDirty = ((TModel) bindableBase).GetIsDirty();
+
+                foreach (var pair in bindableBase.GetStateStore())
+                {
+                    _stateStore[pair.Key] = GetValueState(pair.Value);
+                }
+            }
+
+            public override int GetHashCode()
+            {
+                return _stateStore.GetHashCode();
+            }
+
+            public override bool Equals(object obj)
+            {
+                if (ReferenceEquals(this, obj))
+                {
+                    return true;
+                }
+
+                var model = obj as TModel;
+
+                if (model != null)
+                {
+                    return Equals(model);
+                }
+
+                var exportedModel = obj as IExportedState<TModel>;
+
+                if (exportedModel != null)
+                {
+                    return Equals(exportedModel);
+                }
+
+                return false;
+            }
+
+            object IExportedState.Apply(object item)
+            {
+                return Apply((TModel) item);
+            }
+
+            public bool WasDirty { get; private set; }
+
+            private bool Equals(TModel other)
+            {
+                return Equals(other.ExportState());
+            }
+
+            private bool Equals(IExportedState other)
+            {
+                var stateKeys = new HashSet<string>(_stateStore.Keys);
+                var otherKeys = new HashSet<string>(other.Keys);
+
+                //This is technically incorrect I think, if we've persisted a default value then the key count could be
+                //  different but the items would still be value-equal
+                if (stateKeys.Count != otherKeys.Count)
+                {
+                    return false;
+                }
+
+                stateKeys.IntersectWith(otherKeys);
+
+                //If intersecting the sets of keys resulted in a different number of keys being present
+                //  then different elements have been set amongst the value stores, return false
+                if (otherKeys.Count != stateKeys.Count)
+                {
+                    return false;
+                }
+
+                foreach (var key in stateKeys)
+                {
+                    //If the values for the entries aren't value-equal
+                    if (!Equals(_stateStore[key], other[key]))
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            public IEnumerable<string> Keys { get { return _stateStore.Keys; } }
+
+            public object this[string key]
+            {
+                get { return _stateStore[key]; }
+            }
+
+            public int Count { get { return _stateStore.Count; } }
+
+            public object Apply(TModel item)
+            {
+                var state = item.GetStateStore();
+                var stateKeys = new HashSet<string>(state.Keys);
+                var demandKeys = new HashSet<string>(_stateStore.Keys);
+                var toRemove = stateKeys.Except(demandKeys).ToList();
+                var toAddOrUpdate = demandKeys.Except(toRemove);
+
+                foreach (var key in toRemove)
+                {
+                    state.Remove(key);
+                    item.OnPropertyChanged(key);
+                }
+
+                foreach (var key in toAddOrUpdate)
+                {
+                    object current;
+                    state.TryGetValue(key, out current);
+                    var exported = _stateStore[key] as IExportedState;
+                    
+                    if (exported != null)
+                    {
+                        var result = exported.Apply(current);
+                        state[key] = result;
                     }
                     else
                     {
-                        actions.Add(m =>
-                        {
-                            childKeyAct();
-                            ((IDictionary)m._values)[childKey] = childValue;
-                        });
+                        state[key] = _stateStore[key];
                     }
+
+                    item.OnPropertyChanged(key);
                 }
-                else if (childValue is IExportStateRestorer)
+
+                if (WasDirty)
                 {
-                    var childValueAct = ((IExportStateRestorer)childValue).GetStateRestorer();
-                    actions.Add(m =>
-                    {
-                        childValueAct();
-                        ((IDictionary)m._values[key])[childKey] = childValue;
-                    });
+                    item.MarkDirty();
                 }
                 else
                 {
-                    actions.Add(m => m._values[childKey] = childValue);
+                    item.Clean();
                 }
+
+                return item;
             }
         }
 
-        public void GetListStateRestorer(IList bindableList, string key, List<Action<BindableBase<TModel>>> actions)
+        IExportedState IExportStateRestorer.ExportState()
         {
-            actions.Add(m => ((IList)(m._values[key] = bindableList)).Clear());
-
-            foreach (var child in bindableList)
-            {
-                var childVal = child;
-                if (child is IExportStateRestorer)
-                {
-                    var childAct = ((IExportStateRestorer)child).GetStateRestorer();
-                    actions.Add(m =>
-                    {
-                        childAct();
-                        ((IList)m._values[key]).Add(childVal);
-                    });
-                }
-                else
-                {
-                    actions.Add(m => ((IList)m._values[key]).Add(childVal));
-                }
-            }
+            return ExportState();
         }
 
-        private void GetDirtyStateRestorer(bool wasDirty, List<Action<BindableBase<TModel>>> actions)
+        public IExportedState<TModel> ExportState() 
         {
-            actions.Add(m =>
-            {
-                var dirtyHandler = GetService<DirtyableService>();
-
-                if (dirtyHandler == null)
-                {
-                    return;
-                }
-
-                if (wasDirty)
-                {
-                    dirtyHandler.MarkDirty();
-                }
-                else
-                {
-                    dirtyHandler.Clean();
-                }
-            });
-        }
-
-        private void GetNestedStateRestorer(IExportStateRestorer bindable, string key, List<Action<BindableBase<TModel>>> actions)
-        {
-            var act = bindable.GetStateRestorer();
-            actions.Add(m =>
-            {
-                m._values[key] = bindable;
-                act();
-            });
-        }
-
-        public Action GetStateRestorer()
-        {
-            var actions = new List<Action<BindableBase<TModel>>> { m => m._values.Clear() };
-            var dirtyHandler = _serviceProvider == null ? null : GetService<DirtyableService>();
-            var wasDirty = dirtyHandler != null && dirtyHandler.IsDirty;
-
-            foreach (var entry in _values)
-            {
-                var key = entry.Key;
-
-                if (entry.Value == null)
-                {
-                    actions.Add(m => m._values[key] = null);
-                    actions.Add(m => ((TModel)m).OnPropertyChanged(key));
-                    continue;
-                }
-
-                var value = entry.Value;
-                var bindable = value as IExportStateRestorer;
-
-                if (bindable != null)
-                {
-                    GetNestedStateRestorer(bindable, key, actions);
-                    actions.Add(m => ((TModel)m).OnPropertyChanged(key));
-                    continue;
-                }
-
-                var bindableDictionary = entry.Value as IDictionary;
-
-                if (bindableDictionary != null)
-                {
-                    GetDictionaryStateRestorer(bindableDictionary, key, actions);
-                    actions.Add(m => ((TModel)m).OnPropertyChanged(key));
-                    continue;
-                }
-
-                var bindableList = entry.Value as IList;
-
-                if (bindableList != null)
-                {
-                    GetListStateRestorer(bindableList, key, actions);
-                    actions.Add(m => ((TModel)m).OnPropertyChanged(key));
-                    continue;
-                }
-
-                actions.Add(m => m._values[key] = value);
-                actions.Add(m => ((TModel) m).OnPropertyChanged(key));
-            }
-
-            GetDirtyStateRestorer(wasDirty, actions);
-
-            return () =>
-            {
-                foreach (var action in actions)
-                {
-                    action(this);
-                }
-            };
+            return new BindableBaseState(this);
         }
 
         protected T Get<T>(Expression<Func<TModel, T>> propertyAccessor)
@@ -446,6 +525,14 @@ namespace N3P.MVVM
             }
         }
 
+        public void FinializeInitialization()
+        {
+            foreach (var service in GetServices<IInitializationCompleteCallback>())
+            {
+                service.OnInitializationComplete();
+            }
+        }
+
         private void InstallTopLevelServices()
         {
             InstallServices(typeof(TModel).GetCustomAttributes(typeof(BindingBehaviorAttributeBase), true), "");
@@ -456,6 +543,7 @@ namespace N3P.MVVM
             private readonly BindableBase<TModel> _owner;
             private readonly ServiceProviderImpl _parent;
             private readonly string _propertyName;
+            
             public ServiceProviderImpl(BindableBase<TModel> owner, LambdaExpression propertyAccessor, ServiceProviderImpl parent)
             {
                 _owner = owner;
@@ -495,6 +583,33 @@ namespace N3P.MVVM
             {
                 return new ServiceProviderImpl(_owner, property, this);
             }
+
+            public IEnumerable<T> GetServices<T>()
+            {
+                return _owner._serviceLookup
+                    .Where(x => typeof (T).IsAssignableFrom(x.Key))
+                    .Select(x => x.Value)
+                    .Where(x => x.ContainsKey(_propertyName))
+                    .Select(x => x[_propertyName])
+                    .Distinct()
+                    .Cast<T>()
+                    .ToList();
+            }
+        }
+
+        public void AcceptState<T>(IExportedState<T> state)
+            where T : class, TModel
+        {
+            foreach (var key in state.Keys)
+            {
+                _values[key] = state[key];
+                ((TModel) this).OnPropertyChanged(key);
+            }
+        }
+
+        public IDictionary<string, object> GetStateStore()
+        {
+            return _values;
         }
 
         event PropertyChangedEventHandler INotifyPropertyChanged.PropertyChanged
