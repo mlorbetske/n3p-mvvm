@@ -3,7 +3,7 @@
     public static class UndoableExtensions
     {
         public static void Undo<TModel>(this TModel model)
-            where TModel : BindableBase<TModel>
+            where TModel : class, IBindable<TModel>
         {
             var svc = model.GetService<UndoHandler>();
 
@@ -14,7 +14,7 @@
         }
 
         public static void Redo<TModel>(this TModel model)
-            where TModel : BindableBase<TModel>
+            where TModel : class, IBindable<TModel>
         {
             var svc = model.GetService<UndoHandler>();
 
@@ -25,29 +25,29 @@
         }
 
         public static void SuspendAutoUndoStateCapture<TModel>(this TModel model)
-            where TModel : BindableBase<TModel>
+            where TModel : class, IBindable<TModel>
         {
             var svc = model.GetService<UndoHandler>();
 
             if (svc != null)
             {
-                svc.SuspendAutoStateCapture = true;
+                ++svc.CaptureSuspensionDepth;
             }
         }
 
         public static void ResumeAutoUndoStateCapture<TModel>(this TModel model)
-            where TModel : BindableBase<TModel>
+            where TModel : class, IBindable<TModel>
         {
             var svc = model.GetService<UndoHandler>();
 
             if (svc != null)
             {
-                svc.SuspendAutoStateCapture = false;
+                --svc.CaptureSuspensionDepth;
             }
         }
 
         public static void MakeVolatile<TModel>(this TModel model)
-            where TModel:BindableBase<TModel>
+            where TModel : class, IBindable<TModel>
         {
             var svc = model.GetService<UndoHandler>();
 
@@ -58,7 +58,7 @@
         }
 
         public static void ResetUndoState<TModel>(this TModel model)
-            where TModel : BindableBase<TModel>
+            where TModel : class, IBindable<TModel>
         {
             var svc = model.GetService<UndoHandler>();
 
@@ -69,7 +69,7 @@
         }
 
         public static bool CanUndo<TModel>(this TModel model)
-            where TModel : BindableBase<TModel>
+            where TModel : class, IBindable<TModel>
         {
             var svc = model.GetService<UndoHandler>();
 
@@ -77,7 +77,7 @@
         }
 
         public static bool CanRedo<TModel>(this TModel model)
-            where TModel : BindableBase<TModel>
+            where TModel : class, IBindable<TModel>
         {
             var svc = model.GetService<UndoHandler>();
 

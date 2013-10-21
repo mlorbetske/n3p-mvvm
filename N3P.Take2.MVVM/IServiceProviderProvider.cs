@@ -2,7 +2,7 @@
 
 namespace N3P.MVVM
 {
-    internal interface IServiceProviderProvider
+    public interface IServiceProviderProvider
     {
         TService GetService<TService>();
 

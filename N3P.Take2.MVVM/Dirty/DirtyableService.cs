@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using N3P.MVVM.Undo;
 
 namespace N3P.MVVM.Dirty
 {
@@ -14,6 +15,7 @@ namespace N3P.MVVM.Dirty
         }
 
         public bool IsDirty { get; private set; }
+        public IExportedState CleanVersion { get; private set; }
 
         public void MarkDirty()
         {
@@ -62,6 +64,8 @@ namespace N3P.MVVM.Dirty
             {
                 s.OnDirtyStateChanged();
             }
+
+            CleanVersion = ((IExportStateRestorer) _model).ExportState();
         }
 
         public void Clean()

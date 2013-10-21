@@ -9,10 +9,8 @@ namespace N3P.MVVM
         object this[string key] { get; }
 
         int Count { get; }
-        
-        object Apply(object item);
 
-        bool WasDirty { get; }
+        object Apply(object item);
     }
 
     public interface IExportedState<in T> : IExportedState

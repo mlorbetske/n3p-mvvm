@@ -51,7 +51,7 @@ namespace N3P.MVVM.Undo
             }
         }
 
-        public bool SuspendAutoStateCapture { get; set; }
+        public int CaptureSuspensionDepth { get; set; }
 
         private void MakeAllParentsVolatile()
         {
@@ -84,7 +84,7 @@ namespace N3P.MVVM.Undo
         {
             lock (_sync)
             {
-                if (_operationInProgress || !_operationInProgress && SuspendAutoStateCapture)
+                if (_operationInProgress || !_operationInProgress && CaptureSuspensionDepth != 0)
                 {
                     return;
                 }

@@ -4,7 +4,7 @@ using N3P.MVVM.Undo;
 
 namespace N3P.MVVM
 {
-    public interface IBindable<in TModel> : INotifyPropertyChanged, IExportStateRestorer<TModel>
+    public interface IBindable<in TModel> : INotifyPropertyChanged, IExportStateRestorer<TModel>, IServiceProviderProvider
         where TModel : class, IBindable<TModel>
     {
         void AcceptState<T>(IExportedState<T> state)

@@ -11,7 +11,7 @@ using N3P.MVVM.Undo;
 
 namespace N3P.MVVM
 {
-    public class BindableBase<TModel> : IServiceProviderProvider, IBindable<TModel>
+    public class BindableBase<TModel> : IBindable<TModel>
         where TModel : BindableBase<TModel>
     {
         private readonly HashSet<IServiceProviderProvider> _parents = new HashSet<IServiceProviderProvider>();
@@ -126,7 +126,30 @@ namespace N3P.MVVM
                 return _target;
             }
 
-            public bool WasDirty { get { return false; } }
+            public override bool Equals(object obj)
+            {
+                var list = obj as ListState;
+
+                if (list == null)
+                {
+                    return false;
+                }
+
+                foreach (var item in _values)
+                {
+                    if (!list._values.Any(x => Equals(x, item)))
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            public override int GetHashCode()
+            {
+                return _values.Aggregate(0, (x, y) => x ^ y.Value.GetHashCode());
+            }
         }
 
         private class BindableBaseState : IExportedState<TModel>
@@ -143,6 +166,7 @@ namespace N3P.MVVM
                 }
 
                 var dict = value as IDictionary;
+                //TODO: Implement dictionary state export
 
                 var list = value as IList;
 
@@ -156,8 +180,6 @@ namespace N3P.MVVM
 
             public BindableBaseState(IBindable<TModel> bindableBase)
             {
-                WasDirty = ((TModel) bindableBase).GetIsDirty();
-
                 foreach (var pair in bindableBase.GetStateStore())
                 {
                     _stateStore[pair.Key] = GetValueState(pair.Value);
@@ -197,8 +219,6 @@ namespace N3P.MVVM
             {
                 return Apply((TModel) item);
             }
-
-            public bool WasDirty { get; private set; }
 
             private bool Equals(TModel other)
             {
@@ -280,15 +300,7 @@ namespace N3P.MVVM
                     item.OnPropertyChanged(key);
                 }
 
-                if (WasDirty)
-                {
-                    item.MarkDirty();
-                }
-                else
-                {
-                    item.Clean();
-                }
-
+                item.SetDirtyState(this);
                 return item;
             }
         }
