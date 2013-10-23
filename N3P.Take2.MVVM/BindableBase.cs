@@ -12,7 +12,7 @@ using N3P.MVVM.Undo;
 namespace N3P.MVVM
 {
     public class BindableBase<TModel> : IBindable<TModel>
-        where TModel : BindableBase<TModel>
+        where TModel : BindableBase<TModel>, new()
     {
         private readonly HashSet<IServiceProviderProvider> _parents = new HashSet<IServiceProviderProvider>();
         private readonly HashSet<IServiceProviderProvider> _children = new HashSet<IServiceProviderProvider>();
@@ -269,7 +269,7 @@ namespace N3P.MVVM
 
             public object Apply(TModel item)
             {
-                var state = item.GetStateStore();
+                var state = (item ?? new TModel()).GetStateStore();
                 var stateKeys = new HashSet<string>(state.Keys);
                 var demandKeys = new HashSet<string>(_stateStore.Keys);
                 var toRemove = stateKeys.Except(demandKeys).ToList();
