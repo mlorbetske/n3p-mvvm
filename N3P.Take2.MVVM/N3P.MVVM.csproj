@@ -52,6 +52,7 @@
     <Compile Include="Dirty\DirtyableAttribute.cs" />
     <Compile Include="Dirty\DirtyableExtensions.cs" />
     <Compile Include="Dirty\DirtyableService.cs" />
+    <Compile Include="Dirty\NonDirtyableAttribute.cs" />
     <Compile Include="IBindable.cs" />
     <Compile Include="IExportedState.cs" />
     <Compile Include="IInitializationCompleteCallback.cs" />

@@ -269,7 +269,8 @@ namespace N3P.MVVM
 
             public object Apply(TModel item)
             {
-                var state = (item ?? new TModel()).GetStateStore();
+                var realItem = item ?? new TModel();
+                var state = realItem.GetStateStore();
                 var stateKeys = new HashSet<string>(state.Keys);
                 var demandKeys = new HashSet<string>(_stateStore.Keys);
                 var toRemove = stateKeys.Except(demandKeys).ToList();
@@ -278,7 +279,7 @@ namespace N3P.MVVM
                 foreach (var key in toRemove)
                 {
                     state.Remove(key);
-                    item.OnPropertyChanged(key);
+                    realItem.OnPropertyChanged(key);
                 }
 
                 foreach (var key in toAddOrUpdate)
@@ -297,11 +298,11 @@ namespace N3P.MVVM
                         state[key] = _stateStore[key];
                     }
 
-                    item.OnPropertyChanged(key);
+                    realItem.OnPropertyChanged(key);
                 }
 
-                item.SetDirtyState(this);
-                return item;
+                realItem.SetDirtyState(this);
+                return realItem;
             }
         }
 

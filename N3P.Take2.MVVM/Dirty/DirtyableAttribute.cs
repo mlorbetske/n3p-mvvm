@@ -63,7 +63,7 @@ namespace N3P.MVVM.Dirty
 
         private static void AfterSet(IServiceProvider serviceprovider, object model, string propertyname, object proposedvalue, ref object currentvalue, bool changed)
         {
-            if (changed)
+            if (changed && (model.GetType().GetProperty(propertyname).GetCustomAttributes(typeof(NonDirtyableAttribute), true).Length == 0 ||  model.GetType().GetProperty(propertyname).GetCustomAttributes(typeof(DirtyableAttribute), true).Length != 0))
             {
                 var service = serviceprovider.GetService<DirtyableService>();
                 service.MarkDirty();

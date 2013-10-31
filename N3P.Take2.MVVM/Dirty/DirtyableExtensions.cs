@@ -7,6 +7,11 @@ namespace N3P.MVVM.Dirty
         public static bool GetIsDirty<TModel>(this TModel model)
             where TModel : class, IBindable<TModel>
         {
+            if (model == null)
+            {
+                return false;
+            }
+
             var svc = model.GetService<DirtyableService>();
 
             return svc != null && svc.IsDirty;
@@ -15,12 +20,22 @@ namespace N3P.MVVM.Dirty
         public static bool GetIsDirtyTracked<TModel>(this TModel model)
             where TModel : class, IBindable<TModel>
         {
-            return  model.GetService<DirtyableService>() != null;
+            if (model == null)
+            {
+                return false;
+            }
+            
+            return model.GetService<DirtyableService>() != null;
         }
 
         public static void Clean<TModel>(this TModel model)
             where TModel : class, IBindable<TModel>
         {
+            if (model == null)
+            {
+                return;
+            }
+            
             var svc = model.GetService<DirtyableService>();
 
             if (svc != null)
@@ -32,6 +47,11 @@ namespace N3P.MVVM.Dirty
         public static void MarkDirty<TModel>(this TModel model)
             where TModel : class, IBindable<TModel>
         {
+            if (model == null)
+            {
+                return;
+            }
+            
             var svc = model.GetService<DirtyableService>();
 
             if (svc != null)
@@ -43,6 +63,11 @@ namespace N3P.MVVM.Dirty
         public static void AddDirtyStateChangedHandler<TModel>(this TModel model, EventHandler handler)
             where TModel : class, IBindable<TModel>
         {
+            if (model == null)
+            {
+                return;
+            }
+
             var svc = model.GetService<DirtyableService>();
 
             if (svc != null)
@@ -54,6 +79,11 @@ namespace N3P.MVVM.Dirty
         public static void RemoveDirtyStateChangedHandler<TModel>(this TModel model, EventHandler handler)
             where TModel : class, IBindable<TModel>
         {
+            if (model == null)
+            {
+                return;
+            }
+
             var svc = model.GetService<DirtyableService>();
 
             if (svc != null)
@@ -65,6 +95,11 @@ namespace N3P.MVVM.Dirty
         public static void SetDirtyState<TModel>(this TModel model, IExportedState exportedState)
             where TModel : class, IBindable<TModel>
         {
+            if (model == null)
+            {
+                return;
+            }
+
             var svc = model.GetService<DirtyableService>();
 
             if (svc != null)
