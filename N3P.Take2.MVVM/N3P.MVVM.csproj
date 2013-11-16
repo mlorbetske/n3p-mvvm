@@ -42,7 +42,16 @@
     <Compile Include="BeforeSetAction.cs" />
     <Compile Include="BehaviorDelegates\BeforeSetBindingBehavior.cs" />
     <Compile Include="BehaviorDelegates\InitBindingBehavior.cs" />
+    <Compile Include="BindableBase.BindableBaseState.cs">
+      <DependentUpon>BindableBase.cs</DependentUpon>
+    </Compile>
     <Compile Include="BindableBase.cs" />
+    <Compile Include="BindableBase.ListState.cs">
+      <DependentUpon>BindableBase.cs</DependentUpon>
+    </Compile>
+    <Compile Include="BindableBase.ServiceProviderImpl.cs">
+      <DependentUpon>BindableBase.cs</DependentUpon>
+    </Compile>
     <Compile Include="BindingBehaviorAttributeBase.cs" />
     <Compile Include="BindingActionExtensions.cs" />
     <Compile Include="ChangeTracking\NotifyOnChangeAttribute.cs" />
