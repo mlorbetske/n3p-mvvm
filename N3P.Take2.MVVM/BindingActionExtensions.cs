@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using N3P.MVVM.BehaviorDelegates;
 
 namespace N3P.MVVM
 {

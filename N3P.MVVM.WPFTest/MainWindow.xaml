@@ -1,6 +1,10 @@
 ﻿<Window x:Class="N3P.MVVM.WPFTest.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:viewModels="clr-namespace:N3P.MVVM.WPFTest.ViewModels"
+        mc:Ignorable="d" d:DataContext="{d:DesignInstance viewModels:MainWindowViewModel}"
         Title="MainWindow" Height="350" Width="525">
     <Grid>
         <Grid.RowDefinitions>
@@ -12,9 +16,9 @@
             <ColumnDefinition />
             <ColumnDefinition />
         </Grid.ColumnDefinitions>
-        <TextBlock Text="{Binding SubModel.Value, Mode=TwoWay}" />
-        <Button Grid.Row="1" Grid.RowSpan="2"  Command="{Binding ChangeValueCommand}">Change Value</Button>
-        <Button Grid.Row="1" Grid.Column="1" Command="{Binding UndoCommand}">Undo</Button>
-        <Button Grid.Row="2" Grid.Column="1" Command="{Binding RedoCommand}">Redo</Button>
+        <TextBlock Text="{Binding Path=SubModel.Value}" />
+        <Button Grid.Row="1" Grid.RowSpan="2" Grid.Column="0" Command="{Binding Path=ChangeValueCommand}">Change Value</Button>
+        <Button Grid.Row="1" Grid.Column="1" Command="{Binding Path=UndoCommand}">Undo</Button>
+        <Button Grid.Row="2" Grid.Column="1" Command="{Binding Path=RedoCommand}">Redo</Button>
     </Grid>
 </Window>

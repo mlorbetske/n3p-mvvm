@@ -5,6 +5,8 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
+using N3P.MVVM.BehaviorDelegates;
 using N3P.MVVM.ChangeTracking;
 using N3P.MVVM.Dirty;
 using N3P.MVVM.Undo;
@@ -14,28 +16,46 @@ namespace N3P.MVVM
     public class BindableBase<TModel> : IBindable<TModel>
         where TModel : BindableBase<TModel>, new()
     {
-        private readonly HashSet<IServiceProviderProvider> _parents = new HashSet<IServiceProviderProvider>();
         private readonly HashSet<IServiceProviderProvider> _children = new HashSet<IServiceProviderProvider>();
+        private readonly Dictionary<INotifyCollectionChanged, NotifyCollectionChangedEventHandler> _notifyCollectionChangedEventHandlers = new Dictionary<INotifyCollectionChanged, NotifyCollectionChangedEventHandler>();
+        private readonly HashSet<IServiceProviderProvider> _parents = new HashSet<IServiceProviderProvider>();
         private readonly Dictionary<Type, Dictionary<string, object>> _serviceLookup = new Dictionary<Type, Dictionary<string, object>>();
         private readonly ServiceProviderImpl _serviceProvider;
         private readonly Dictionary<string, object> _values = new Dictionary<string, object>();
+        private readonly HashSet<BindingBehaviorAttributeBase> _initedServices = new HashSet<BindingBehaviorAttributeBase>();
 
         public BindableBase()
         {
+            _serviceProvider = new ServiceProviderImpl(this, null, null);
             InstallTopLevelServices();
             InstallPropertyServices();
-
-            _serviceProvider = new ServiceProviderImpl(this, null, null);
         }
 
-        public IEnumerable<TService> GetServices<TService>()
+        public event PropertyChangedEventHandler PropertyChanged
         {
-            return _serviceProvider.GetServices<TService>();
-        }
+            add
+            {
+                var inp = GetService<INotifyPropertyChanged>();
 
-        HashSet<IServiceProviderProvider> IServiceProviderProvider.Parents { get { return _parents; } }
+                if (inp != null)
+                {
+                    inp.PropertyChanged += value;
+                }
+            }
+            remove
+            {
+                var inp = GetService<INotifyPropertyChanged>();
+
+                if (inp != null)
+                {
+                    inp.PropertyChanged -= value;
+                }
+            }
+        }
 
         HashSet<IServiceProviderProvider> IServiceProviderProvider.Children { get { return _children; } }
+
+        HashSet<IServiceProviderProvider> IServiceProviderProvider.Parents { get { return _parents; } }
 
         public static IEnumerable<TDelegate> GetActions<TDelegate, T>(Expression<Func<TModel, T>> propertyAccessor)
         {
@@ -49,6 +69,29 @@ namespace N3P.MVVM
             var property = memberAccess.Member;
             var actions = new List<TDelegate>(typeof(TModel).GetBindingActions<TDelegate>(property));
             return actions.Distinct(DelegateEqualityComparer<TDelegate>.Default);
+        }
+
+        public void AcceptState<T>(IExportedState<T> state)
+            where T : class, TModel
+        {
+            foreach (var key in state.Keys)
+            {
+                _values[key] = state[key];
+                ((TModel)this).OnPropertyChanged(key);
+            }
+        }
+
+        public IExportedState<TModel> ExportState()
+        {
+            return new BindableBaseState(this);
+        }
+
+        public void FinializeInitialization()
+        {
+            foreach (var service in GetServices<IInitializationCompleteCallback>())
+            {
+                service.OnInitializationComplete();
+            }
         }
 
         public TService GetService<TService>()
@@ -66,254 +109,19 @@ namespace N3P.MVVM
             return _serviceProvider.Specialized(propertyAccessor);
         }
 
-        private class ListState : IExportedState
+        public IEnumerable<TService> GetServices<TService>()
         {
-            private readonly IList _target;
-            private readonly List<KeyValuePair<object, object>> _values = new List<KeyValuePair<object, object>>();
-
-            public ListState(IList list)
-            {
-                _target = list;
-
-                foreach (var value in list)
-                {
-                    var exportable = value as IExportStateRestorer;
-
-                    if (exportable != null)
-                    {
-                        _values.Add(new KeyValuePair<object, object>(value, exportable.ExportState()));
-                        continue;
-                    }
-
-                    var nestedList = value as IList;
-
-                    if (nestedList != null)
-                    {
-                        _values.Add(new KeyValuePair<object, object>(value, new ListState(nestedList)));
-                        continue;
-                    }
-
-                    _values.Add(new KeyValuePair<object, object>(value, value));
-                }
-            }
-
-            public IEnumerable<string> Keys { get {return new string[0];} }
-
-            public object this[string key]
-            {
-                get { throw new KeyNotFoundException(); }
-            }
-
-            public int Count { get { return 0; } }
-
-            public object Apply(object item)
-            {
-                _target.Clear();
-
-                foreach (var listItem in _values)
-                {
-                    var state = listItem.Value as IExportedState;
-
-                    if (state != null)
-                    {
-                        _target.Add(state.Apply(listItem.Key));
-                        continue;
-                    }
-
-                    _target.Add(listItem.Value);
-                }
-
-                return _target;
-            }
-
-            public override bool Equals(object obj)
-            {
-                var list = obj as ListState;
-
-                if (list == null)
-                {
-                    return false;
-                }
-
-                foreach (var item in _values)
-                {
-                    if (!list._values.Any(x => Equals(x, item)))
-                    {
-                        return false;
-                    }
-                }
-
-                return true;
-            }
-
-            public override int GetHashCode()
-            {
-                return _values.Aggregate(0, (x, y) => x ^ y.Value.GetHashCode());
-            }
+            return _serviceProvider.GetServices<TService>();
         }
 
-        private class BindableBaseState : IExportedState<TModel>
+        public IDictionary<string, object> GetStateStore()
         {
-            private readonly IDictionary<string, object> _stateStore = new Dictionary<string, object>();
-
-            private static object GetValueState(object value)
-            {
-                var exportable = value as IExportStateRestorer;
-
-                if (exportable != null)
-                {
-                    return exportable.ExportState();
-                }
-
-                var dict = value as IDictionary;
-                //TODO: Implement dictionary state export
-
-                var list = value as IList;
-
-                if (list != null)
-                {
-                    return new ListState(list);
-                }
-
-                return value;
-            }
-
-            public BindableBaseState(IBindable<TModel> bindableBase)
-            {
-                foreach (var pair in bindableBase.GetStateStore())
-                {
-                    _stateStore[pair.Key] = GetValueState(pair.Value);
-                }
-            }
-
-            public override int GetHashCode()
-            {
-                return _stateStore.GetHashCode();
-            }
-
-            public override bool Equals(object obj)
-            {
-                if (ReferenceEquals(this, obj))
-                {
-                    return true;
-                }
-
-                var model = obj as TModel;
-
-                if (model != null)
-                {
-                    return Equals(model);
-                }
-
-                var exportedModel = obj as IExportedState<TModel>;
-
-                if (exportedModel != null)
-                {
-                    return Equals(exportedModel);
-                }
-
-                return false;
-            }
-
-            object IExportedState.Apply(object item)
-            {
-                return Apply((TModel) item);
-            }
-
-            private bool Equals(TModel other)
-            {
-                return Equals(other.ExportState());
-            }
-
-            private bool Equals(IExportedState other)
-            {
-                var stateKeys = new HashSet<string>(_stateStore.Keys);
-                var otherKeys = new HashSet<string>(other.Keys);
-
-                //This is technically incorrect I think, if we've persisted a default value then the key count could be
-                //  different but the items would still be value-equal
-                if (stateKeys.Count != otherKeys.Count)
-                {
-                    return false;
-                }
-
-                stateKeys.IntersectWith(otherKeys);
-
-                //If intersecting the sets of keys resulted in a different number of keys being present
-                //  then different elements have been set amongst the value stores, return false
-                if (otherKeys.Count != stateKeys.Count)
-                {
-                    return false;
-                }
-
-                foreach (var key in stateKeys)
-                {
-                    //If the values for the entries aren't value-equal
-                    if (!Equals(_stateStore[key], other[key]))
-                    {
-                        return false;
-                    }
-                }
-
-                return true;
-            }
-
-            public IEnumerable<string> Keys { get { return _stateStore.Keys; } }
-
-            public object this[string key]
-            {
-                get { return _stateStore[key]; }
-            }
-
-            public int Count { get { return _stateStore.Count; } }
-
-            public object Apply(TModel item)
-            {
-                var realItem = item ?? new TModel();
-                var state = realItem.GetStateStore();
-                var stateKeys = new HashSet<string>(state.Keys);
-                var demandKeys = new HashSet<string>(_stateStore.Keys);
-                var toRemove = stateKeys.Except(demandKeys).ToList();
-                var toAddOrUpdate = demandKeys.Except(toRemove);
-
-                foreach (var key in toRemove)
-                {
-                    state.Remove(key);
-                    realItem.OnPropertyChanged(key);
-                }
-
-                foreach (var key in toAddOrUpdate)
-                {
-                    object current;
-                    state.TryGetValue(key, out current);
-                    var exported = _stateStore[key] as IExportedState;
-                    
-                    if (exported != null)
-                    {
-                        var result = exported.Apply(current);
-                        state[key] = result;
-                    }
-                    else
-                    {
-                        state[key] = _stateStore[key];
-                    }
-
-                    realItem.OnPropertyChanged(key);
-                }
-
-                realItem.SetDirtyState(this);
-                return realItem;
-            }
+            return _values;
         }
 
         IExportedState IExportStateRestorer.ExportState()
         {
             return ExportState();
-        }
-
-        public IExportedState<TModel> ExportState() 
-        {
-            return new BindableBaseState(this);
         }
 
         protected T Get<T>(Expression<Func<TModel, T>> propertyAccessor)
@@ -353,12 +161,111 @@ namespace N3P.MVVM
             return (T)existing;
         }
 
-        private readonly Dictionary<INotifyCollectionChanged, NotifyCollectionChangedEventHandler> _notifyCollectionChangedEventHandlers = new Dictionary<INotifyCollectionChanged, NotifyCollectionChangedEventHandler>();
+        protected void Set<T>(Expression<Func<TModel, T>> propertyAccessor, T value)
+        {
+            var specializedProvider = _serviceProvider.Specialized(propertyAccessor);
+            var name = GetPropertyName(propertyAccessor);
+            var current = (object)Get(propertyAccessor);
+            var valueCopy = (object)value;
+
+            var beforeSet = GetActions<BeforeSetBindingBehavior, T>(propertyAccessor);
+
+            foreach (var behavior in beforeSet)
+            {
+                if (behavior(specializedProvider, this, name, ref valueCopy, ref current) == BeforeSetAction.Reject)
+                {
+                    return;
+                }
+            }
+
+            var changed = !Equals(current, valueCopy);
+
+            if (changed)
+            {
+                current = _values[name] = valueCopy;
+            }
+
+            var afterSet = GetActions<AfterSetBindingBehavior, T>(propertyAccessor);
+
+            foreach (var behavior in afterSet)
+            {
+                behavior(specializedProvider, this, name, value, ref current, changed);
+            }
+
+            WireUpParentChildRelationships(current);
+            _values[name] = current;
+        }
+
+        private static string GetPropertyName<T>(Expression<Func<TModel, T>> propertyAccessor)
+        {
+            var memberAccess = propertyAccessor.Body as MemberExpression;
+
+            if (memberAccess == null || memberAccess.Member.Name.TrimStart("Runtime".ToCharArray()) == "PropertyInfo")
+            {
+                throw new ArgumentException("Supplied expression does not access a property", "propertyAccessor");
+            }
+
+            return memberAccess.Member.Name;
+        }
+
+        private void InstallPropertyServices()
+        {
+            foreach (var prop in typeof(TModel).GetProperties())
+            {
+                InstallServices(prop.GetCustomAttributes(typeof(BindingBehaviorAttributeBase), true), prop.Name);
+            }
+        }
+
+        private void InstallServices(IEnumerable behaviors, string bag)
+        {
+            foreach (BindingBehaviorAttributeBase behavior in behaviors)
+            {
+                var matchedService = behavior.GetService(this);
+                if (behavior.ServiceType != null && matchedService != null)
+                {
+                    Dictionary<string, object> lookup;
+                    if (!_serviceLookup.TryGetValue(behavior.ServiceType, out lookup))
+                    {
+                        lookup = _serviceLookup[behavior.ServiceType] = new Dictionary<string, object>();
+                    }
+
+                    if (behavior.IsGlobalServiceOnly)
+                    {
+                        object service;
+                        if (!lookup.TryGetValue("", out service))
+                        {
+                            lookup[""] = matchedService;
+                        }
+                    }
+                    else
+                    {
+                        lookup[bag] = matchedService;
+                    }
+                }
+
+                var init = behavior.AllActions.OfType<InitBindingBehavior>().SingleOrDefault();
+
+                if (init != null && _initedServices.Add(behavior))
+                {
+                    init(_serviceProvider, _serviceProvider.Specialized<TModel>, this, s =>
+                    {
+                        object v;
+                        _values.TryGetValue(s, out v);
+                        return v;
+                    }, (s, o) => _values[s] = o);
+                }
+            }
+        }
+
+        private void InstallTopLevelServices()
+        {
+            InstallServices(typeof(TModel).GetCustomAttributes(typeof(BindingBehaviorAttributeBase), true), "");
+        }
 
         private void WireUpParentChildRelationships(object value)
         {
             var valueProvider = value as IServiceProviderProvider;
-            var modelProvider = (IServiceProviderProvider) this;
+            var modelProvider = (IServiceProviderProvider)this;
 
             if (valueProvider != null)
             {
@@ -454,101 +361,243 @@ namespace N3P.MVVM
             }
         }
 
-        protected void Set<T>(Expression<Func<TModel, T>> propertyAccessor, T value)
+        private class BindableBaseState : IExportedState<TModel>
         {
-            var specializedProvider = _serviceProvider.Specialized(propertyAccessor);
-            var name = GetPropertyName(propertyAccessor);
-            var current = (object)Get(propertyAccessor);
-            var valueCopy = (object)value;
+            private readonly IDictionary<string, object> _stateStore = new Dictionary<string, object>();
 
-            var beforeSet = GetActions<BeforeSetBindingBehavior, T>(propertyAccessor);
-
-            foreach (var behavior in beforeSet)
+            public BindableBaseState(IBindable<TModel> bindableBase)
             {
-                if (behavior(specializedProvider, this, name, ref valueCopy, ref current) == BeforeSetAction.Reject)
+                foreach (var pair in bindableBase.GetStateStore())
                 {
-                    return;
+                    _stateStore[pair.Key] = GetValueState(pair.Value);
                 }
             }
 
-            var changed = !Equals(current, valueCopy);
+            public int Count { get { return _stateStore.Count; } }
 
-            if (changed)
+            public IEnumerable<string> Keys { get { return _stateStore.Keys; } }
+
+            public object this[string key]
             {
-                current = _values[name] = valueCopy;
+                get { return _stateStore[key]; }
             }
 
-            var afterSet = GetActions<AfterSetBindingBehavior, T>(propertyAccessor);
-
-            foreach (var behavior in afterSet)
+            public object Apply(TModel item)
             {
-                behavior(specializedProvider, this, name, value, ref current, changed);
-            }
+                var realItem = item ?? new TModel();
+                var state = realItem.GetStateStore();
+                var stateKeys = new HashSet<string>(state.Keys);
+                var demandKeys = new HashSet<string>(_stateStore.Keys);
+                var toRemove = stateKeys.Except(demandKeys).ToList();
+                var toAddOrUpdate = demandKeys.Except(toRemove);
 
-            WireUpParentChildRelationships(current);
-            _values[name] = current;
-        }
-
-        private static string GetPropertyName<T>(Expression<Func<TModel, T>> propertyAccessor)
-        {
-            var memberAccess = propertyAccessor.Body as MemberExpression;
-
-            if (memberAccess == null || memberAccess.Member.Name.TrimStart("Runtime".ToCharArray()) == "PropertyInfo")
-            {
-                throw new ArgumentException("Supplied expression does not access a property", "propertyAccessor");
-            }
-
-            return memberAccess.Member.Name;
-        }
-
-        private void InstallPropertyServices()
-        {
-            foreach (var prop in typeof(TModel).GetProperties())
-            {
-                InstallServices(prop.GetCustomAttributes(typeof(BindingBehaviorAttributeBase), true), prop.Name);
-            }
-        }
-
-        private void InstallServices(IEnumerable behaviors, string bag)
-        {
-            foreach (BindingBehaviorAttributeBase behavior in behaviors)
-            {
-                var matchedService = behavior.GetService(this);
-                if (behavior.ServiceType != null && matchedService != null)
+                foreach (var key in toRemove)
                 {
-                    Dictionary<string, object> lookup;
-                    if (!_serviceLookup.TryGetValue(behavior.ServiceType, out lookup))
-                    {
-                        lookup = _serviceLookup[behavior.ServiceType] = new Dictionary<string, object>();
-                    }
+                    state.Remove(key);
+                    realItem.OnPropertyChanged(key);
+                }
 
-                    if (behavior.IsGlobalServiceOnly)
+                foreach (var key in toAddOrUpdate)
+                {
+                    object current;
+                    state.TryGetValue(key, out current);
+                    var exported = _stateStore[key] as IExportedState;
+
+                    if (exported != null)
                     {
-                        object service;
-                        if (!lookup.TryGetValue("", out service))
-                        {
-                            lookup[""] = matchedService;
-                        }
+                        var result = exported.Apply(current);
+                        state[key] = result;
                     }
                     else
                     {
-                        lookup[bag] = matchedService;
+                        state[key] = _stateStore[key];
+                    }
+
+                    realItem.OnPropertyChanged(key);
+                }
+
+                realItem.SetDirtyState(this);
+                return realItem;
+            }
+
+            public override bool Equals(object obj)
+            {
+                if (ReferenceEquals(this, obj))
+                {
+                    return true;
+                }
+
+                var model = obj as TModel;
+
+                if (model != null)
+                {
+                    return Equals(model);
+                }
+
+                var exportedModel = obj as IExportedState<TModel>;
+
+                if (exportedModel != null)
+                {
+                    return Equals(exportedModel);
+                }
+
+                return false;
+            }
+
+            public override int GetHashCode()
+            {
+                return _stateStore.GetHashCode();
+            }
+
+            object IExportedState.Apply(object item)
+            {
+                return Apply((TModel)item);
+            }
+
+            private static object GetValueState(object value)
+            {
+                var exportable = value as IExportStateRestorer;
+
+                if (exportable != null)
+                {
+                    return exportable.ExportState();
+                }
+
+                var dict = value as IDictionary;
+                //TODO: Implement dictionary state export
+
+                var list = value as IList;
+
+                if (list != null)
+                {
+                    return new ListState(list);
+                }
+
+                return value;
+            }
+            private bool Equals(TModel other)
+            {
+                return Equals(other.ExportState());
+            }
+
+            private bool Equals(IExportedState other)
+            {
+                var stateKeys = new HashSet<string>(_stateStore.Keys);
+                var otherKeys = new HashSet<string>(other.Keys);
+
+                //This is technically incorrect I think, if we've persisted a default value then the key count could be
+                //  different but the items would still be value-equal
+                if (stateKeys.Count != otherKeys.Count)
+                {
+                    return false;
+                }
+
+                stateKeys.IntersectWith(otherKeys);
+
+                //If intersecting the sets of keys resulted in a different number of keys being present
+                //  then different elements have been set amongst the value stores, return false
+                if (otherKeys.Count != stateKeys.Count)
+                {
+                    return false;
+                }
+
+                foreach (var key in stateKeys)
+                {
+                    //If the values for the entries aren't value-equal
+                    if (!Equals(_stateStore[key], other[key]))
+                    {
+                        return false;
                     }
                 }
+
+                return true;
             }
         }
 
-        public void FinializeInitialization()
+        private class ListState : IExportedState
         {
-            foreach (var service in GetServices<IInitializationCompleteCallback>())
+            private readonly IList _target;
+            private readonly List<KeyValuePair<object, object>> _values = new List<KeyValuePair<object, object>>();
+
+            public ListState(IList list)
             {
-                service.OnInitializationComplete();
-            }
-        }
+                _target = list;
 
-        private void InstallTopLevelServices()
-        {
-            InstallServices(typeof(TModel).GetCustomAttributes(typeof(BindingBehaviorAttributeBase), true), "");
+                foreach (var value in list)
+                {
+                    var exportable = value as IExportStateRestorer;
+
+                    if (exportable != null)
+                    {
+                        _values.Add(new KeyValuePair<object, object>(value, exportable.ExportState()));
+                        continue;
+                    }
+
+                    var nestedList = value as IList;
+
+                    if (nestedList != null)
+                    {
+                        _values.Add(new KeyValuePair<object, object>(value, new ListState(nestedList)));
+                        continue;
+                    }
+
+                    _values.Add(new KeyValuePair<object, object>(value, value));
+                }
+            }
+
+            public int Count { get { return 0; } }
+
+            public IEnumerable<string> Keys { get { return new string[0]; } }
+
+            public object this[string key]
+            {
+                get { throw new KeyNotFoundException(); }
+            }
+
+            public object Apply(object item)
+            {
+                _target.Clear();
+
+                foreach (var listItem in _values)
+                {
+                    var state = listItem.Value as IExportedState;
+
+                    if (state != null)
+                    {
+                        _target.Add(state.Apply(listItem.Key));
+                        continue;
+                    }
+
+                    _target.Add(listItem.Value);
+                }
+
+                return _target;
+            }
+
+            public override bool Equals(object obj)
+            {
+                var list = obj as ListState;
+
+                if (list == null)
+                {
+                    return false;
+                }
+
+                foreach (var item in _values)
+                {
+                    if (!list._values.Any(x => Equals(x, item)))
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            public override int GetHashCode()
+            {
+                return _values.Aggregate(0, (x, y) => x ^ y.Value.GetHashCode());
+            }
         }
 
         private class ServiceProviderImpl : IServiceProvider
@@ -592,15 +641,10 @@ namespace N3P.MVVM
                 return service ?? (_parent != null ? _parent.GetService(serviceType) : null);
             }
 
-            public IServiceProvider Specialized<T>(Expression<Func<TModel, T>> property)
-            {
-                return new ServiceProviderImpl(_owner, property, this);
-            }
-
             public IEnumerable<T> GetServices<T>()
             {
                 return _owner._serviceLookup
-                    .Where(x => typeof (T).IsAssignableFrom(x.Key))
+                    .Where(x => typeof(T).IsAssignableFrom(x.Key))
                     .Select(x => x.Value)
                     .Where(x => x.ContainsKey(_propertyName))
                     .Select(x => x[_propertyName])
@@ -608,42 +652,18 @@ namespace N3P.MVVM
                     .Cast<T>()
                     .ToList();
             }
-        }
 
-        public void AcceptState<T>(IExportedState<T> state)
-            where T : class, TModel
-        {
-            foreach (var key in state.Keys)
+            public IServiceProvider Specialized<T>(Expression<Func<TModel, T>> property)
             {
-                _values[key] = state[key];
-                ((TModel) this).OnPropertyChanged(key);
+                return new ServiceProviderImpl(_owner, property, this);
             }
-        }
 
-        public IDictionary<string, object> GetStateStore()
-        {
-            return _values;
-        }
-
-        event PropertyChangedEventHandler INotifyPropertyChanged.PropertyChanged
-        {
-            add
+            public IServiceProvider Specialized<T>(PropertyInfo property)
             {
-                var inp = GetService<INotifyPropertyChanged>();
-
-                if (inp != null)
-                {
-                    inp.PropertyChanged += value;
-                }
-            }
-            remove
-            {
-                var inp = GetService<INotifyPropertyChanged>();
-
-                if (inp != null)
-                {
-                    inp.PropertyChanged -= value;
-                }
+                var modelParam = Expression.Parameter(typeof (T));
+                var expr = Expression.MakeMemberAccess(modelParam, property);
+                var lambda = Expression.Lambda(expr, new[] {modelParam});
+                return new ServiceProviderImpl(_owner, lambda, this);
             }
         }
     }

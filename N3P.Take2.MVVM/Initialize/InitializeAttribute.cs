@@ -30,7 +30,7 @@ namespace N3P.MVVM.Initialize
         }
 
         public InitializeAttribute(string staticInitializationMethodName = "", string initializationParametersStaticPropertyName = "")
-            : base(afterGet: AfterGetBindingBehavior, afterGetPriority: int.MinValue)
+            : base(init: Initialize, initPriority: int.MinValue)
         {
             _service = new InitializationConfig
             {
@@ -39,67 +39,60 @@ namespace N3P.MVVM.Initialize
             };
         }
 
-        private static object AfterGetBindingBehavior(IServiceProvider serviceprovider, object model, string propertyname, object currentvalue)
+        private static void Initialize(IServiceProvider modelServiceProvider, Func<PropertyInfo, IServiceProvider> specializedServiceProviderGetter, object model, Func<string, object> getProperty, Action<string, object> setProperty)
+        {
+            foreach (var prop in model.GetType().GetProperties())
+            {
+                var attrs = prop.GetCustomAttributes(typeof (InitializeAttribute), false);
+                
+                if (attrs.Length == 0)
+                {
+                    continue;
+                }
+
+                var val = GetInitValue(specializedServiceProviderGetter(prop), model, prop);
+                setProperty(prop.Name, val);
+            }
+        }
+
+        private static object GetInitValue(IServiceProvider serviceprovider, object model, PropertyInfo prop)
         {
             var cfg = serviceprovider.GetService<InitializationConfig>();
-            var prop = model.GetType().GetProperty(propertyname);
             var propType = prop.PropertyType;
 
-            if (IsDefault(propType, currentvalue))
+            cfg.HasRun = true;
+            object[] initializationParameters = null;
+
+            if (!string.IsNullOrEmpty(cfg.InitializationParametersStaticPropertyName))
             {
-                if (cfg.HasRun)
+                var initProp = propType.GetProperty(cfg.InitializationParametersStaticPropertyName, BindingFlags.Public | BindingFlags.Static);
+
+                initProp = initProp ?? model.GetType().GetProperty(cfg.InitializationParametersStaticPropertyName, BindingFlags.Public | BindingFlags.Static);
+
+                if (initProp == null)
                 {
-                    return cfg.DefaultValue();
+                    var val = cfg.InitializationParametersStaticPropertyName;
+                    return (cfg.DefaultValue = () => val)();
                 }
 
-                cfg.HasRun = true;
-                object[] initializationParameters = null;
-
-                if (!string.IsNullOrEmpty(cfg.InitializationParametersStaticPropertyName))
+                if (initProp.PropertyType != typeof (object[]))
                 {
-                    var initProp = propType.GetProperty(cfg.InitializationParametersStaticPropertyName, BindingFlags.Public | BindingFlags.Static);
-                    
-                    initProp = initProp ?? model.GetType().GetProperty(cfg.InitializationParametersStaticPropertyName, BindingFlags.Public | BindingFlags.Static);
-
-                    if (initProp == null)
-                    {
-                        var val = cfg.InitializationParametersStaticPropertyName;
-                        return (cfg.DefaultValue = () => val)();
-                    }
-
-                    if (initProp.PropertyType != typeof (object[]))
-                    {
-                        return (cfg.DefaultValue = () => initProp.GetValue(null, null))();
-                    }
-
-                    initializationParameters = (object[]) initProp.GetValue(null, null);
+                    return (cfg.DefaultValue = () => initProp.GetValue(null, null))();
                 }
 
-                if (!string.IsNullOrEmpty(cfg.StaticInitializationMethodName))
-                {
-                    var initMethod = propType.GetMethod(cfg.StaticInitializationMethodName, BindingFlags.Public | BindingFlags.Static);
-
-                    initMethod = initMethod ?? model.GetType().GetMethod(cfg.StaticInitializationMethodName, BindingFlags.Public | BindingFlags.Static);
-
-                    return (cfg.DefaultValue = () => initMethod.Invoke(null, initializationParameters))();
-                }
-
-                return (cfg.DefaultValue = () => Activator.CreateInstance(propType, initializationParameters))();
+                initializationParameters = (object[]) initProp.GetValue(null, null);
             }
 
-            return currentvalue;
-        }
+            if (!string.IsNullOrEmpty(cfg.StaticInitializationMethodName))
+            {
+                var initMethod = propType.GetMethod(cfg.StaticInitializationMethodName, BindingFlags.Public | BindingFlags.Static);
 
-        private static readonly MethodInfo GetDefaultMethod = ((Func<object>)GetDefault<object>).Method.GetGenericMethodDefinition();
+                initMethod = initMethod ?? model.GetType().GetMethod(cfg.StaticInitializationMethodName, BindingFlags.Public | BindingFlags.Static);
 
-        private static T GetDefault<T>()
-        {
-            return default(T);
-        }
+                return (cfg.DefaultValue = () => initMethod.Invoke(null, initializationParameters))();
+            }
 
-        private static bool IsDefault(Type type, object value)
-        {
-            return Equals(GetDefaultMethod.MakeGenericMethod(type).Invoke(null, null), value);
+            return (cfg.DefaultValue = () => Activator.CreateInstance(propType, initializationParameters))();
         }
     }
 }

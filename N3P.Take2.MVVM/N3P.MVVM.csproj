@@ -36,15 +36,15 @@
     <!-- A reference to the entire .NET Framework is automatically included -->
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AfterGetBindingBehavior.cs" />
-    <Compile Include="AfterSetBindingBehavior.cs" />
-    <Compile Include="BeforeGetBindingBehavior.cs" />
+    <Compile Include="BehaviorDelegates\AfterGetBindingBehavior.cs" />
+    <Compile Include="BehaviorDelegates\AfterSetBindingBehavior.cs" />
+    <Compile Include="BehaviorDelegates\BeforeGetBindingBehavior.cs" />
     <Compile Include="BeforeSetAction.cs" />
-    <Compile Include="BeforeSetBindingBehavior.cs" />
+    <Compile Include="BehaviorDelegates\BeforeSetBindingBehavior.cs" />
+    <Compile Include="BehaviorDelegates\InitBindingBehavior.cs" />
     <Compile Include="BindableBase.cs" />
     <Compile Include="BindingBehaviorAttributeBase.cs" />
     <Compile Include="BindingActionExtensions.cs" />
-    <Compile Include="ChangeTracking\INotifyPropertyChangedBindingBehavior.cs" />
     <Compile Include="ChangeTracking\NotifyOnChangeAttribute.cs" />
     <Compile Include="ChangeTracking\NotifyOnChangeExtensions.cs" />
     <Compile Include="Command.cs" />

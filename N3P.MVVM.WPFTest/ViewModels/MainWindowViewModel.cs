@@ -27,8 +27,9 @@ namespace N3P.MVVM.WPFTest.ViewModels
             {
                 SubModel.Value = Guid.NewGuid().ToString();
             });
-            UndoCommand = new Command(this.Undo);
-            RedoCommand = new Command(this.Redo);
+
+            UndoCommand = this.GetUndoCommand();
+            RedoCommand = this.GetRedoCommand();
         }
         
         public DateTime Chickens
@@ -41,26 +42,12 @@ namespace N3P.MVVM.WPFTest.ViewModels
         public SubModel SubModel
         {
             get { return Get(x => x.SubModel); }
-            set { Set(x => x.SubModel, value); }
-        }
-	    
-
-        public ICommand ChangeValueCommand
-        {
-            get { return Get(x => x.ChangeValueCommand); }
-            set { Set(x => x.ChangeValueCommand, value); }
         }
 
-        public ICommand UndoCommand
-        {
-            get { return Get(x => x.UndoCommand); }
-            set { Set(x => x.UndoCommand, value); }
-        }
+        public ICommand ChangeValueCommand { get; private set; }
 
-        public ICommand RedoCommand
-        {
-            get { return Get(x => x.RedoCommand); }
-            set { Set(x => x.RedoCommand, value); }
-        }
+        public ICommand UndoCommand { get; private set; }
+
+        public ICommand RedoCommand { get; private set; }
     }
 }

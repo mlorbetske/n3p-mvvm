@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Specialized;
+using System.Reflection;
 
 namespace N3P.MVVM.Dirty
 {
@@ -7,8 +8,13 @@ namespace N3P.MVVM.Dirty
     public class DirtyableAttribute : BindingBehaviorAttributeBase
     {
         public DirtyableAttribute()
-            : base(afterGet: AfterGet, afterSet: AfterSet, afterSetPriority: int.MaxValue, afterGetPriority: int.MaxValue)
+            : base(afterGet: AfterGet, afterSet: AfterSet, init: Initialize, afterSetPriority: int.MaxValue, afterGetPriority: int.MaxValue, initPriority: int.MaxValue)
         {
+        }
+
+        private static void Initialize(IServiceProvider serviceprovider, Func<PropertyInfo, IServiceProvider> specializedserviceprovidergetter, object model, Func<string, object> getProperty, Action<string, object> setProperty)
+        {
+            serviceprovider.GetService<DirtyableService>().Clean();
         }
 
         public override Type ServiceType

@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Windows;
 using N3P.MVVM.Dirty;
-using N3P.MVVM.Undo;
 using N3P.MVVM.WPFTest.ViewModels;
 
 namespace N3P.MVVM.WPFTest

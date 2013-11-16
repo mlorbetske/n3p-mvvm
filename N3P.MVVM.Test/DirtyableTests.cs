@@ -56,6 +56,7 @@ namespace N3P.MVVM.Test
             Assert.IsFalse(mid.GetIsDirty());
             top.Mid.Value = new Uri("http://amazon.com");
             Assert.IsTrue(top.GetIsDirty());
+
         }
     }
 }

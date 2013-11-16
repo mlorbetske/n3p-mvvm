@@ -1,4 +1,6 @@
-﻿namespace N3P.MVVM.Undo
+﻿using System.Windows.Input;
+
+namespace N3P.MVVM.Undo
 {
     public static class UndoableExtensions
     {
@@ -82,6 +84,18 @@
             var svc = model.GetService<UndoHandler>();
 
             return svc != null && svc.CanRedo;
+        }
+
+        public static ICommand GetUndoCommand<TModel>(this TModel model)
+            where TModel : class, IBindable<TModel>
+        {
+            return new Command(model.Undo);
+        }
+
+        public static ICommand GetRedoCommand<TModel>(this TModel model)
+            where TModel : class, IBindable<TModel>
+        {
+            return new Command(model.Redo);
         }
     }
 }

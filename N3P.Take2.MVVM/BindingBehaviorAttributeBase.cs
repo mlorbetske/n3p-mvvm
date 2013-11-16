@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using N3P.MVVM.BehaviorDelegates;
 
 namespace N3P.MVVM
 {
@@ -15,19 +16,22 @@ namespace N3P.MVVM
         public virtual Type ServiceType { get { return null; } }
 
         public virtual object GetService(object model) { return null; }
+
         public virtual bool IsGlobalServiceOnly { get { return false; } }
 
         internal int BeforeGetPriority { get; private set; }
         internal int AfterGetPriority { get; private set; }
         internal int BeforeSetPriority { get; private set; }
         internal int AfterSetPriority { get; private set; }
+        internal int InitPriority { get; private set; }
 
-        protected BindingBehaviorAttributeBase(BeforeGetBindingBehavior beforeGet = null, AfterGetBindingBehavior afterGet = null, BeforeSetBindingBehavior beforeSet = null, AfterSetBindingBehavior afterSet = null, int beforeGetPriority = int.MaxValue / 2, int afterGetPriority = int.MaxValue / 2, int beforeSetPriority = int.MaxValue / 2, int afterSetPriority = int.MaxValue / 2)
+        protected BindingBehaviorAttributeBase(BeforeGetBindingBehavior beforeGet = null, AfterGetBindingBehavior afterGet = null, BeforeSetBindingBehavior beforeSet = null, AfterSetBindingBehavior afterSet = null, InitBindingBehavior init = null, int beforeGetPriority = int.MaxValue / 2, int afterGetPriority = int.MaxValue / 2, int beforeSetPriority = int.MaxValue / 2, int afterSetPriority = int.MaxValue / 2, int initPriority = int.MaxValue / 2)
         {
             BeforeGetPriority = beforeGetPriority;
             AfterGetPriority = afterGetPriority;
             BeforeSetPriority = beforeSetPriority;
             AfterSetPriority = afterSetPriority;
+            InitPriority = initPriority;
 
             if (beforeGet != null)
             {
@@ -47,6 +51,11 @@ namespace N3P.MVVM
             if (afterSet != null)
             {
                 _behaviors.Add(afterSet);
+            }
+
+            if (init != null)
+            {
+                _behaviors.Add(init);
             }
         }
     }
