@@ -358,5 +358,25 @@ namespace N3P.MVVM
                 }
             }
         }
+
+        public Command CreateCommand(Action action)
+        {
+            return new Command(action);
+        }
+
+        public Command<T> CreateCommand<T>(Action<T> action)
+        {
+            return new Command<T>(action);
+        }
+
+        public Command CreateCommand(Action action, Func<bool> canExecute)
+        {
+            return new Command(action, canExecute);
+        }
+
+        public Command<T> CreateCommand<T>(Action<T> action, Func<T, bool> canExecute)
+        {
+            return new Command<T>(action, canExecute);
+        }
     }
 }

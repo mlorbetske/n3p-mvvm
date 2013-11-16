@@ -12,19 +12,9 @@ namespace N3P.MVVM.WPFTest.ViewModels
     {
         public MainWindowViewModel()
         {
-            ChangeValueCommand = new Command(() =>
-            {
-                SubModel.Value = Guid.NewGuid().ToString();
-            });
-
+            ChangeValueCommand = CreateCommand(() => SubModel.Value = Guid.NewGuid().ToString());
             UndoCommand = this.GetUndoCommand();
             RedoCommand = this.GetRedoCommand();
-        }
-        
-        public DateTime Chickens
-        {
-            get { return Get(x => x.Chickens); }
-            set { Set(x => x.Chickens, value); }
         }
         
         [Initialize]
