@@ -8,17 +8,6 @@ using N3P.MVVM.Initialize;
 namespace N3P.MVVM.WPFTest.ViewModels
 {
     [NotifyOnChange, Undoable, Dirtyable]
-    public class SubModel : BindableBase<SubModel>
-    {
-        [Initialize(initializationParametersStaticPropertyName: "Chickens")]
-        public string Value
-        {
-            get { return Get(x => x.Value); }
-            set { Set(x => x.Value, value); }
-        }
-    }
-
-    [NotifyOnChange, Undoable, Dirtyable]
     public class MainWindowViewModel : BindableBase<MainWindowViewModel>
     {
         public MainWindowViewModel()

@@ -8,13 +8,9 @@ namespace N3P.MVVM.Initialize
     {
         private class InitializationConfig
         {
-            public bool HasRun { get; set; }
-
             public string StaticInitializationMethodName { get; set; }
 
             public string InitializationParametersStaticPropertyName { get; set; }
-
-            public Func<object> DefaultValue { get; set; }
         }
 
         public override Type ServiceType
@@ -60,7 +56,6 @@ namespace N3P.MVVM.Initialize
             var cfg = serviceprovider.GetService<InitializationConfig>();
             var propType = prop.PropertyType;
 
-            cfg.HasRun = true;
             object[] initializationParameters = null;
 
             if (!string.IsNullOrEmpty(cfg.InitializationParametersStaticPropertyName))
@@ -72,12 +67,12 @@ namespace N3P.MVVM.Initialize
                 if (initProp == null)
                 {
                     var val = cfg.InitializationParametersStaticPropertyName;
-                    return (cfg.DefaultValue = () => val)();
+                    return val;
                 }
 
                 if (initProp.PropertyType != typeof (object[]))
                 {
-                    return (cfg.DefaultValue = () => initProp.GetValue(null, null))();
+                    return initProp.GetValue(null, null);
                 }
 
                 initializationParameters = (object[]) initProp.GetValue(null, null);
@@ -89,10 +84,10 @@ namespace N3P.MVVM.Initialize
 
                 initMethod = initMethod ?? model.GetType().GetMethod(cfg.StaticInitializationMethodName, BindingFlags.Public | BindingFlags.Static);
 
-                return (cfg.DefaultValue = () => initMethod.Invoke(null, initializationParameters))();
+                return initMethod.Invoke(null, initializationParameters);
             }
 
-            return (cfg.DefaultValue = () => Activator.CreateInstance(propType, initializationParameters))();
+            return Activator.CreateInstance(propType, initializationParameters);
         }
     }
 }
