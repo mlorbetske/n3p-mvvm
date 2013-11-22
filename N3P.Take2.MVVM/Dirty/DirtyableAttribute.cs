@@ -12,9 +12,9 @@ namespace N3P.MVVM.Dirty
         {
         }
 
-        private static void Initialize(IServiceProvider serviceprovider, Func<PropertyInfo, IServiceProvider> specializedserviceprovidergetter, object model, Func<string, object> getProperty, Action<string, object> setProperty)
+        private static void Initialize(IServiceProvider serviceprovider, Func<PropertyInfo, IServiceProvider> specializedserviceprovidergetter, object model, Func<string, object> getProperty, Action<string, object> setProperty, string propertyName)
         {
-            serviceprovider.GetService<DirtyableService>().Clean();
+            serviceprovider.GetService<DirtyableService>().SetCleanVersion();
         }
 
         public override Type ServiceType

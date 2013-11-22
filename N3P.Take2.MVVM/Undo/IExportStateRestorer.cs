@@ -4,10 +4,4 @@
     {
         IExportedState ExportState();
     }
-
-    public interface IExportStateRestorer<in TModel> : IExportStateRestorer
-        where TModel : class
-    {
-        new IExportedState<TModel> ExportState();
-    }
 }

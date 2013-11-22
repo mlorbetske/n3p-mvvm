@@ -46,6 +46,7 @@
       <DependentUpon>BindableBase.cs</DependentUpon>
     </Compile>
     <Compile Include="BindableBase.cs" />
+    <Compile Include="BindableBase.DictionaryState.cs" />
     <Compile Include="BindableBase.ListState.cs">
       <DependentUpon>BindableBase.cs</DependentUpon>
     </Compile>
@@ -62,7 +63,9 @@
     <Compile Include="Dirty\DirtyableExtensions.cs" />
     <Compile Include="Dirty\DirtyableService.cs" />
     <Compile Include="Dirty\NonDirtyableAttribute.cs" />
+    <Compile Include="ExportedStateBase.cs" />
     <Compile Include="IBindable.cs" />
+    <Compile Include="IdentityState.cs" />
     <Compile Include="IExportedState.cs" />
     <Compile Include="IInitializationCompleteCallback.cs" />
     <Compile Include="Initialize\InitializeAttribute.cs" />

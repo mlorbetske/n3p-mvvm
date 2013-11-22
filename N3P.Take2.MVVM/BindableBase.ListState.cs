@@ -1,16 +1,15 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using N3P.MVVM.Undo;
 
 namespace N3P.MVVM
 {
     public partial class BindableBase<TModel>
     {
-        private class ListState : IExportedState
+        private class ListState : ExportedStateBase
         {
             private readonly IList _target;
-            private readonly List<KeyValuePair<object, object>> _values = new List<KeyValuePair<object, object>>();
+            private readonly List<IExportedState> _values = new List<IExportedState>();
 
             public ListState(IList list)
             {
@@ -18,67 +17,43 @@ namespace N3P.MVVM
 
                 foreach (var value in list)
                 {
-                    var exportable = value as IExportStateRestorer;
-
-                    if (exportable != null)
-                    {
-                        _values.Add(new KeyValuePair<object, object>(value, exportable.ExportState()));
-                        continue;
-                    }
-
-                    var nestedList = value as IList;
-
-                    if (nestedList != null)
-                    {
-                        _values.Add(new KeyValuePair<object, object>(value, new ListState(nestedList)));
-                        continue;
-                    }
-
-                    _values.Add(new KeyValuePair<object, object>(value, value));
+                    var result = ExportItemState(value);
+                    _values.Add(result);
                 }
-            }
-
-            public int Count { get { return 0; } }
-
-            public IEnumerable<string> Keys { get { return new string[0]; } }
-
-            public object this[string key]
-            {
-                get { throw new KeyNotFoundException(); }
-            }
-
-            public object Apply(object item)
-            {
-                _target.Clear();
-
-                foreach (var listItem in _values)
-                {
-                    var state = listItem.Value as IExportedState;
-
-                    if (state != null)
-                    {
-                        _target.Add(state.Apply(listItem.Key));
-                        continue;
-                    }
-
-                    _target.Add(listItem.Value);
-                }
-
-                return _target;
             }
 
             public override bool Equals(object obj)
             {
                 var list = obj as ListState;
 
-                if (list == null)
+                if (list != null)
+                {
+                    if (list._values.Count != _values.Count)
+                    {
+                        return false;
+                    }
+
+                    foreach (var item in _values)
+                    {
+                        if (!list._values.Any(x => Equals(x, item)))
+                        {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                }
+
+                var realList = obj as IList;
+
+                if (realList == null || realList.Count != _values.Count)
                 {
                     return false;
                 }
 
-                foreach (var item in _values)
+                foreach (var item in realList)
                 {
-                    if (!list._values.Any(x => Equals(x, item)))
+                    if (_values.All(x => !Equals(x, item)))
                     {
                         return false;
                     }
@@ -89,7 +64,19 @@ namespace N3P.MVVM
 
             public override int GetHashCode()
             {
-                return _values.Aggregate(0, (x, y) => x ^ y.Value.GetHashCode());
+                return _values.Aggregate(0, (x, y) => x ^ y.GetHashCode());
+            }
+
+            public override object Apply()
+            {
+                _target.Clear();
+
+                foreach (var listItem in _values)
+                {
+                    _target.Add(listItem.Apply());
+                }
+
+                return _target;
             }
         }
     }

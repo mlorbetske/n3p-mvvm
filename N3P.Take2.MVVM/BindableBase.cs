@@ -12,7 +12,7 @@ using N3P.MVVM.Undo;
 namespace N3P.MVVM
 {
     public partial class BindableBase<TModel> : IBindable<TModel>
-        where TModel : BindableBase<TModel>, new()
+        where TModel : BindableBase<TModel>
     {
         private readonly HashSet<IServiceProviderProvider> _children = new HashSet<IServiceProviderProvider>();
         private readonly Dictionary<INotifyCollectionChanged, NotifyCollectionChangedEventHandler> _notifyCollectionChangedEventHandlers = new Dictionary<INotifyCollectionChanged, NotifyCollectionChangedEventHandler>();
@@ -27,6 +27,7 @@ namespace N3P.MVVM
             _serviceProvider = new ServiceProviderImpl(this, null, null);
             InstallTopLevelServices();
             InstallPropertyServices();
+            InitTopLevelServices();
         }
 
         public event PropertyChangedEventHandler PropertyChanged
@@ -69,17 +70,16 @@ namespace N3P.MVVM
             return actions.Distinct(DelegateEqualityComparer<TDelegate>.Default);
         }
 
-        public void AcceptState<T>(IExportedState<T> state)
-            where T : class, TModel
+        public void AcceptState(IExportedState state)
         {
             foreach (var key in state.Keys)
             {
                 _values[key] = state[key];
-                ((TModel)this).OnPropertyChanged(key);
+                ((IBindable<TModel>)this).OnPropertyChanged(key);
             }
         }
 
-        public IExportedState<TModel> ExportState()
+        public IExportedState ExportState()
         {
             return new BindableBaseState(this);
         }
@@ -210,13 +210,13 @@ namespace N3P.MVVM
         {
             foreach (var prop in typeof(TModel).GetProperties())
             {
-                InstallServices(prop.GetCustomAttributes(typeof(BindingBehaviorAttributeBase), true), prop.Name);
+                InstallServices(prop.GetCustomAttributes(typeof(BindingBehaviorAttributeBase), true).OfType<BindingBehaviorAttributeBase>(), prop.Name);
             }
         }
 
-        private void InstallServices(IEnumerable behaviors, string bag)
+        private void InstallServices(IEnumerable<BindingBehaviorAttributeBase> behaviors, string bag)
         {
-            foreach (BindingBehaviorAttributeBase behavior in behaviors)
+            foreach (var behavior in behaviors.OrderBy(x => x.InitPriority))
             {
                 var matchedService = behavior.GetService(this);
                 if (behavior.ServiceType != null && matchedService != null)
@@ -237,8 +237,13 @@ namespace N3P.MVVM
                     }
                     else
                     {
-                        lookup[bag] = matchedService;
+                        lookup[bag ?? ""] = matchedService;
                     }
+                }
+
+                if (string.IsNullOrEmpty(bag))
+                {
+                    continue;
                 }
 
                 var init = behavior.AllActions.OfType<InitBindingBehavior>().SingleOrDefault();
@@ -250,14 +255,34 @@ namespace N3P.MVVM
                         object v;
                         _values.TryGetValue(s, out v);
                         return v;
-                    }, (s, o) => _values[s] = o);
+                    }, (s, o) => _values[s] = o, bag);
+                }
+            }
+        }
+
+        private void InitTopLevelServices()
+        {
+            var behaviors = typeof (TModel).GetCustomAttributes(typeof (BindingBehaviorAttributeBase), true).OfType<BindingBehaviorAttributeBase>();
+
+            foreach (var behavior in behaviors.OrderBy(x => x.InitPriority))
+            {
+                var init = behavior.AllActions.OfType<InitBindingBehavior>().SingleOrDefault();
+
+                if (init != null && _initedServices.Add(behavior))
+                {
+                    init(_serviceProvider, _serviceProvider.Specialized<TModel>, this, s =>
+                    {
+                        object v;
+                        _values.TryGetValue(s, out v);
+                        return v;
+                    }, (s, o) => _values[s] = o, "");
                 }
             }
         }
 
         private void InstallTopLevelServices()
         {
-            InstallServices(typeof(TModel).GetCustomAttributes(typeof(BindingBehaviorAttributeBase), true), "");
+            InstallServices(typeof(TModel).GetCustomAttributes(typeof(BindingBehaviorAttributeBase), true).OfType<BindingBehaviorAttributeBase>(), "");
         }
 
         private void WireUpParentChildRelationships(object value)

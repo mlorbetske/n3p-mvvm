@@ -65,7 +65,7 @@ namespace N3P.MVVM.Dirty
                 s.OnDirtyStateChanged();
             }
 
-            CleanVersion = ((IExportStateRestorer) _model).ExportState();
+            SetCleanVersion();
         }
 
         public void Clean()
@@ -90,6 +90,11 @@ namespace N3P.MVVM.Dirty
         public void OnInitializationComplete()
         {
             Clean();
+        }
+
+        internal void SetCleanVersion()
+        {
+            CleanVersion = ((IExportStateRestorer)_model).ExportState();
         }
     }
 }

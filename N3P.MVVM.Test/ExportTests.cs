@@ -1,4 +1,6 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using System.Collections.Generic;
+using System.Linq;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace N3P.MVVM.Test
 {
@@ -30,6 +32,15 @@ namespace N3P.MVVM.Test
             }
         }
 
+        public class MyEntity2 : BindableBase<MyEntity2>
+        {
+            [Initialize.Initialize]
+            public Dictionary<string, List<int>> Mess
+            {
+                get { return Get(x => x.Mess); }
+            }
+        }
+
         [TestMethod]
         public void ValidateExport()
         {
@@ -45,9 +56,32 @@ namespace N3P.MVVM.Test
             var eState = e.ExportState();
             e.Foo = "asodifj";
             e.Entity.A = 10;
-            eState.Apply(e);
+            e = (MyEntity) eState.Apply();
             Assert.AreEqual("Hi", e.Foo);
             Assert.AreEqual(5, e.Entity.A);
+
+            var e2 = new MyEntity2();
+            e2.Mess["Hi"] = new List<int> {1, 2, 3};
+            var estate21 = e2.ExportState();
+            e2.Mess["There"] = new List<int> {4, 5, 6};
+            var estate22 = e2.ExportState();
+            e2.Mess["Hi"].RemoveAt(1);
+            var estate23 = e2.ExportState();
+
+            e2 = (MyEntity2) estate21.Apply();
+            Assert.AreEqual(1, e2.Mess.Count);
+            Assert.AreEqual(3, e2.Mess["Hi"].Count);
+            Assert.IsTrue(new[] {1, 2, 3}.SequenceEqual(e2.Mess["Hi"]));
+
+            e2 = (MyEntity2) estate23.Apply();
+            Assert.AreEqual(2, e2.Mess.Count);
+            Assert.AreEqual(2, e2.Mess["Hi"].Count);
+            Assert.IsTrue(new[] { 1, 3 }.SequenceEqual(e2.Mess["Hi"]));
+
+            e2 = (MyEntity2)estate22.Apply();
+            Assert.AreEqual(2, e2.Mess.Count);
+            Assert.AreEqual(3, e2.Mess["Hi"].Count);
+            Assert.IsTrue(new[] { 1, 2, 3 }.SequenceEqual(e2.Mess["Hi"]));
         }
     }
 }

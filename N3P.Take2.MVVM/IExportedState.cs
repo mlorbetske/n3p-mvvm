@@ -10,12 +10,6 @@ namespace N3P.MVVM
 
         int Count { get; }
 
-        object Apply(object item);
-    }
-
-    public interface IExportedState<in T> : IExportedState
-        where T : class
-    {
-        object Apply(T item);
+        object Apply();
     }
 }

@@ -106,7 +106,7 @@ namespace N3P.MVVM.Undo
                 _operationInProgress = true;
                 _redoStack.Push(CurrentStateRestorer());
                 var frame = _undoStack.Pop();
-                frame.Apply(_target);
+                frame.Apply();
                 CurrentStateRestorer = () => frame;
                 MakeAllParentsVolatile();
                 _operationInProgress = false;
@@ -125,7 +125,7 @@ namespace N3P.MVVM.Undo
                 _operationInProgress = true;
                 _undoStack.Push(CurrentStateRestorer());
                 var frame = _redoStack.Pop();
-                frame.Apply(_target);
+                frame.Apply();
                 CurrentStateRestorer = () => frame;
                 MakeAllParentsVolatile();
                 _operationInProgress = false;

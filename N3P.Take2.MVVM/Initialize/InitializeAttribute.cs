@@ -35,20 +35,30 @@ namespace N3P.MVVM.Initialize
             };
         }
 
-        private static void Initialize(IServiceProvider modelServiceProvider, Func<PropertyInfo, IServiceProvider> specializedServiceProviderGetter, object model, Func<string, object> getProperty, Action<string, object> setProperty)
+        private static void Initialize(IServiceProvider modelServiceProvider, Func<PropertyInfo, IServiceProvider> specializedServiceProviderGetter, object model, Func<string, object> getProperty, Action<string, object> setProperty, string propertyName)
         {
-            foreach (var prop in model.GetType().GetProperties())
+            if (propertyName == null)
             {
-                var attrs = prop.GetCustomAttributes(typeof (InitializeAttribute), false);
-                
-                if (attrs.Length == 0)
-                {
-                    continue;
-                }
-
-                var val = GetInitValue(specializedServiceProviderGetter(prop), model, prop);
-                setProperty(prop.Name, val);
+                return;
             }
+
+            var prop = model.GetType().GetProperty(propertyName);
+            var attrs = prop.GetCustomAttributes(typeof (InitializeAttribute), false);
+
+            if (attrs.Length == 0)
+            {
+                return;
+            }
+
+            var provider = specializedServiceProviderGetter(prop);
+
+            if (provider == null)
+            {
+                return;
+            }
+
+            var val = GetInitValue(specializedServiceProviderGetter(prop), model, prop);
+            setProperty(prop.Name, val);
         }
 
         private static object GetInitValue(IServiceProvider serviceprovider, object model, PropertyInfo prop)

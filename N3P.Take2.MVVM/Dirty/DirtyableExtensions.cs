@@ -114,5 +114,11 @@ namespace N3P.MVVM.Dirty
                 }
             }
         }
+
+        public static void SetDirtyState<TModel>(this IBindable<TModel> model, IExportedState state)
+            where TModel : class, IBindable<TModel>
+        {
+            ((TModel)model).SetDirtyState(state);
+        } 
     }
 }

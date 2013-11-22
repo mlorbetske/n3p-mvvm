@@ -1,23 +1,24 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using N3P.MVVM.ChangeTracking;
 using N3P.MVVM.Dirty;
-using N3P.MVVM.Undo;
 
 namespace N3P.MVVM
 {
     public partial class BindableBase<TModel>
     {
-        private class BindableBaseState : IExportedState<TModel>
+        private class BindableBaseState : IExportedState
         {
-            private readonly IDictionary<string, object> _stateStore = new Dictionary<string, object>();
+            private readonly IDictionary<string, IExportedState> _stateStore = new Dictionary<string, IExportedState>();
+            private readonly IBindable<TModel> _item;
 
             public BindableBaseState(IBindable<TModel> bindableBase)
             {
+                _item = bindableBase;
+
                 foreach (var pair in bindableBase.GetStateStore())
                 {
-                    _stateStore[pair.Key] = GetValueState(pair.Value);
+                    _stateStore[pair.Key] = ExportedStateBase.ExportItemState(pair.Value);
                 }
             }
 
@@ -30,9 +31,9 @@ namespace N3P.MVVM
                 get { return _stateStore[key]; }
             }
 
-            public object Apply(TModel item)
+            public object Apply()
             {
-                var realItem = item ?? new TModel();
+                var realItem = _item;
                 var state = realItem.GetStateStore();
                 var stateKeys = new HashSet<string>(state.Keys);
                 var demandKeys = new HashSet<string>(_stateStore.Keys);
@@ -49,17 +50,10 @@ namespace N3P.MVVM
                 {
                     object current;
                     state.TryGetValue(key, out current);
-                    var exported = _stateStore[key] as IExportedState;
+                    var exported = _stateStore[key];
 
-                    if (exported != null)
-                    {
-                        var result = exported.Apply(current);
-                        state[key] = result;
-                    }
-                    else
-                    {
-                        state[key] = _stateStore[key];
-                    }
+                    var result = exported.Apply();
+                    state[key] = result;
 
                     realItem.OnPropertyChanged(key);
                 }
@@ -82,7 +76,7 @@ namespace N3P.MVVM
                     return Equals(model);
                 }
 
-                var exportedModel = obj as IExportedState<TModel>;
+                var exportedModel = obj as IExportedState;
 
                 if (exportedModel != null)
                 {
@@ -97,32 +91,6 @@ namespace N3P.MVVM
                 return _stateStore.GetHashCode();
             }
 
-            object IExportedState.Apply(object item)
-            {
-                return Apply((TModel)item);
-            }
-
-            private static object GetValueState(object value)
-            {
-                var exportable = value as IExportStateRestorer;
-
-                if (exportable != null)
-                {
-                    return exportable.ExportState();
-                }
-
-                var dict = value as IDictionary;
-                //TODO: Implement dictionary state export
-
-                var list = value as IList;
-
-                if (list != null)
-                {
-                    return new ListState(list);
-                }
-
-                return value;
-            }
             private bool Equals(TModel other)
             {
                 return Equals(other.ExportState());
